@@ -1,0 +1,59 @@
+import React, { useState } from 'react';
+
+const Login = ({ setToken }) => {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    try {
+      const response = await fetch('http://127.0.0.1:5000/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const data = await response.json();
+      if (response.ok) {
+        setToken(data.access_token);
+        alert('Login successful!');
+      } else {
+        alert(data.message || 'Invalid email or password');
+      }
+    } catch (error) {
+      console.error('Error logging in:', error);
+      alert('An error occurred. Please try again.');
+    }
+  };
+
+  return (
+    <div>
+      <h2>Login</h2>
+      <form onSubmit={handleLogin}>
+        <div>
+          <label>Email:</label>
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+          />
+        </div>
+        <div>
+          <label>Password:</label>
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+          />
+        </div>
+        <button type="submit">Login</button>
+      </form>
+    </div>
+  );
+};
+
+export default Login;
