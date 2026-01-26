@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import UserDetails from './UserDetails';
+import { useNavigate } from 'react-router-dom';
 
 const Employees = ({ token }) => {
   const [employees, setEmployees] = useState([]);
@@ -13,10 +14,56 @@ const Employees = ({ token }) => {
   const [totalPages, setTotalPages] = useState(1);
   const [selectedUser, setSelectedUser] = useState(null);
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
+  
+  const navigate = useNavigate();
+  
+  // --- 1. SPRAWDZANIE UPRAWNIEŃ ---
+  const [userRole, setUserRole] = useState(null);
+  const [authChecked, setAuthChecked] = useState(false); // Flaga, czy sprawdzono rolę
 
   useEffect(() => {
-    fetchEmployees();
-  }, [filters]);
+    if (token) {
+      const role = getRoleFromToken(token);
+      setUserRole(role);
+      
+      // ZABEZPIECZENIE: Jeśli to zwykły pracownik -> wyrzuć
+      if (role === 'employee') {
+          navigate('/');
+      } else {
+          setAuthChecked(true); // Pozwalamy na renderowanie
+      }
+    }
+  }, [token, navigate]);
+
+  const getRoleFromToken = (jwtToken) => {
+    try {
+      const base64Url = jwtToken.split('.')[1];
+      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+      const jsonPayload = decodeURIComponent(window.atob(base64).split('').map(function(c) {
+          return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+      }).join(''));
+      const payload = JSON.parse(jsonPayload);
+      if (payload.sub && payload.sub.role) {
+          return payload.sub.role;
+      }
+      return null;
+    } catch (e) {
+      console.error("Błąd dekodowania tokena:", e);
+      return null;
+    }
+  };
+
+  const canEdit = userRole === 'admin' || userRole === 'global_hr';
+  // -------------------------------------------------------------------
+
+  useEffect(() => {
+    // Pobieraj dane tylko jeśli rola została sprawdzona i jest poprawna
+    if (authChecked) {
+        fetchEmployees();
+    }
+    // eslint-disable-next-line
+  }, [filters, authChecked]);
+
 
   const fetchEmployees = async () => {
     try {
@@ -40,7 +87,7 @@ const Employees = ({ token }) => {
       const data = await response.json();
       setEmployees(data.employees);
       setTotalPages(data.pages);
-      setHighlightedIndex(-1); // Resetuj zaznaczenie po odświeżeniu
+      setHighlightedIndex(-1);
     } catch (error) {
       console.error('Error fetching employees:', error);
     }
@@ -60,6 +107,8 @@ const Employees = ({ token }) => {
   };
 
   const handleKeyDown = (e) => {
+    if (!canEdit) return; // Blokada dla Local HR
+
     if (e.key === 'ArrowUp') {
       setHighlightedIndex((prev) => Math.max(prev - 1, 0));
     } else if (e.key === 'ArrowDown') {
@@ -70,22 +119,33 @@ const Employees = ({ token }) => {
   };
 
   const handleRowClick = (index) => {
+    if (!canEdit) return; // Blokada dla Local HR
     setSelectedUser(employees[index].id);
   };
 
+  const handleBack = () => {
+      setSelectedUser(null);
+      fetchEmployees(); 
+  };
+
+  // Jeśli rola jeszcze nie sprawdzona lub użytkownik nieuprawniony -> nie renderuj nic
+  if (!authChecked) return null;
+
   return (
-    <div onKeyDown={handleKeyDown} tabIndex={0} style={{ outline: 'none' }}>
-      <h2>Employees</h2>
+    <div onKeyDown={handleKeyDown} tabIndex={0} style={{ outline: 'none', padding: '20px' }}>
+      <h2 style={{ fontSize: '24px', marginBottom: '20px', fontWeight: 'bold' }}>Employees</h2>
+      
       {selectedUser ? (
         <UserDetails
           userId={selectedUser}
           token={token}
-          onBack={() => setSelectedUser(null)}
+          onBack={handleBack}
+          canEdit={canEdit} 
         />
       ) : (
         <>
-          <div>
-            <label>
+          <div style={{ marginBottom: '20px', display: 'flex', gap: '15px', flexWrap: 'wrap', alignItems: 'center' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
               <input
                 type="checkbox"
                 name="noObject"
@@ -94,7 +154,7 @@ const Employees = ({ token }) => {
               />
               No Object
             </label>
-            <label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
               <input
                 type="checkbox"
                 name="noDepartment"
@@ -103,7 +163,12 @@ const Employees = ({ token }) => {
               />
               No Department
             </label>
-            <select name="sortBy" value={filters.sortBy} onChange={handleFilterChange}>
+            <select 
+                name="sortBy" 
+                value={filters.sortBy} 
+                onChange={handleFilterChange}
+                style={{ padding: '5px', border: '1px solid #ccc', borderRadius: '4px' }}
+            >
               <option value="name">Sort by Name</option>
               <option value="object">Sort by Object</option>
               <option value="department">Sort by Department</option>
@@ -114,17 +179,19 @@ const Employees = ({ token }) => {
               value={filters.search}
               placeholder="Search by Name"
               onChange={handleFilterChange}
+              style={{ padding: '5px', border: '1px solid #ccc', borderRadius: '4px', flex: 1 }}
             />
           </div>
-          <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '20px' }}>
-            <thead>
+
+          <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '20px', backgroundColor: 'white', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }}>
+            <thead style={{ backgroundColor: '#f3f4f6' }}>
               <tr>
-                <th style={{ border: '1px solid black', padding: '8px' }}>Name</th>
-                <th style={{ border: '1px solid black', padding: '8px' }}>Email</th>
-                <th style={{ border: '1px solid black', padding: '8px' }}>Role</th>
-                <th style={{ border: '1px solid black', padding: '8px' }}>Object ID</th>
-                <th style={{ border: '1px solid black', padding: '8px' }}>Department ID</th>
-                <th style={{ border: '1px solid black', padding: '8px' }}>Contract Type</th>
+                <th style={{ border: '1px solid #ddd', padding: '12px', textAlign: 'left' }}>Name</th>
+                <th style={{ border: '1px solid #ddd', padding: '12px', textAlign: 'left' }}>Email</th>
+                <th style={{ border: '1px solid #ddd', padding: '12px', textAlign: 'left' }}>Role</th>
+                <th style={{ border: '1px solid #ddd', padding: '12px', textAlign: 'left' }}>Object</th>
+                <th style={{ border: '1px solid #ddd', padding: '12px', textAlign: 'left' }}>Department</th>
+                <th style={{ border: '1px solid #ddd', padding: '12px', textAlign: 'left' }}>Contract Type</th>
               </tr>
             </thead>
             <tbody>
@@ -134,29 +201,49 @@ const Employees = ({ token }) => {
                   onClick={() => handleRowClick(index)}
                   style={{
                     backgroundColor: highlightedIndex === index ? '#e0e0e0' : 'white',
-                    cursor: 'pointer',
+                    cursor: canEdit ? 'pointer' : 'default', 
+                    transition: 'background-color 0.2s'
+                  }}
+                  onMouseEnter={(e) => {
+                      if(canEdit) e.currentTarget.style.backgroundColor = '#f9fafb';
+                  }}
+                  onMouseLeave={(e) => {
+                      if(canEdit) e.currentTarget.style.backgroundColor = 'white';
                   }}
                 >
-                  <td style={{ border: '1px solid black', padding: '8px' }}>{emp.name}</td>
-                  <td style={{ border: '1px solid black', padding: '8px' }}>{emp.email}</td>
-                  <td style={{ border: '1px solid black', padding: '8px' }}>{emp.role}</td>
-                  <td style={{ border: '1px solid black', padding: '8px' }}>
-                    {emp.object_id || 'None'}
+                  <td style={{ border: '1px solid #ddd', padding: '8px', fontWeight: 'bold', color: canEdit ? '#2563eb' : 'black' }}>
+                      {emp.name}
                   </td>
-                  <td style={{ border: '1px solid black', padding: '8px' }}>
-                    {emp.department_id || 'None'}
+                  <td style={{ border: '1px solid #ddd', padding: '8px' }}>{emp.email}</td>
+                  <td style={{ border: '1px solid #ddd', padding: '8px' }}>{emp.role}</td>
+                  
+                  <td style={{ border: '1px solid #ddd', padding: '8px' }}>
+                    {emp.object_name || <span style={{color: '#999'}}>-</span>}
                   </td>
-                  <td style={{ border: '1px solid black', padding: '8px' }}>
-                    {emp.contract_type || 'None'}
+                  <td style={{ border: '1px solid #ddd', padding: '8px' }}>
+                    {emp.department_name || <span style={{color: '#999'}}>-</span>}
+                  </td>
+                  
+                  <td style={{ border: '1px solid #ddd', padding: '8px' }}>
+                    {emp.contract_type || <span style={{color: '#999'}}>-</span>}
                   </td>
                 </tr>
               ))}
+              {employees.length === 0 && (
+                  <tr>
+                      <td colSpan="6" style={{ padding: '20px', textAlign: 'center', color: '#666' }}>
+                          Brak pracowników spełniających kryteria.
+                      </td>
+                  </tr>
+              )}
             </tbody>
           </table>
-          <div>
+
+          <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <button
               onClick={() => handlePageChange(filters.page - 1)}
               disabled={filters.page <= 1}
+              style={{ padding: '8px 16px', cursor: filters.page <= 1 ? 'not-allowed' : 'pointer', backgroundColor: '#e5e7eb', border: 'none', borderRadius: '4px' }}
             >
               Previous
             </button>
@@ -166,6 +253,7 @@ const Employees = ({ token }) => {
             <button
               onClick={() => handlePageChange(filters.page + 1)}
               disabled={filters.page >= totalPages}
+              style={{ padding: '8px 16px', cursor: filters.page >= totalPages ? 'not-allowed' : 'pointer', backgroundColor: '#e5e7eb', border: 'none', borderRadius: '4px' }}
             >
               Next
             </button>
