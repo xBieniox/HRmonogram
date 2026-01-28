@@ -109,134 +109,210 @@ const Employees = ({ token }) => {
 
   if (!authChecked) return null;
 
+  // --- STYLE ---
+  const containerStyle = {
+      maxWidth: '1200px', margin: '0 auto', padding: '0'
+  };
+
+  const cardStyle = {
+      background: 'white', padding: '20px', borderRadius: '8px', 
+      boxShadow: '0 2px 8px rgba(0,0,0,0.08)', marginBottom: '20px'
+  };
+
+  const inputStyle = {
+      padding: '8px 12px', border: '1px solid #ced4da', borderRadius: '4px', fontSize: '14px'
+  };
+
+  const thStyle = {
+      textAlign: 'left', padding: '12px 15px', 
+      background: '#f8f9fa', borderBottom: '2px solid #dee2e6',
+      color: '#495057', fontSize: '13px', textTransform: 'uppercase', fontWeight: '600'
+  };
+
+  const tdStyle = {
+      padding: '12px 15px', borderBottom: '1px solid #e9ecef', color: '#333', fontSize: '14px'
+  };
+
+  const roleBadgeStyle = (role) => {
+      let bg = '#e2e3e5';
+      let color = '#383d41';
+      if(role === 'admin') { bg = '#d1ecf1'; color = '#0c5460'; }
+      if(role === 'global_hr') { bg = '#d4edda'; color = '#155724'; }
+      if(role === 'local_hr') { bg = '#fff3cd'; color = '#856404'; }
+      return {
+          backgroundColor: bg, color: color, padding: '3px 8px', 
+          borderRadius: '12px', fontSize: '11px', fontWeight: 'bold', textTransform: 'uppercase'
+      };
+  };
+
   return (
-    <div onKeyDown={handleKeyDown} tabIndex={0} style={{ outline: 'none', padding: '20px' }}>
-      <h2 style={{ fontSize: '24px', marginBottom: '20px', fontWeight: 'bold' }}>Employees</h2>
+    <div onKeyDown={handleKeyDown} tabIndex={0} style={{ outline: 'none' }}>
       
       {selectedUser ? (
-        <UserDetails
-          userId={selectedUser}
-          token={token}
-          onBack={handleBack}
-          canEdit={canEdit} 
-        />
+        // Widok Szczegółów
+        <div style={containerStyle}>
+             <UserDetails
+                userId={selectedUser}
+                token={token}
+                onBack={handleBack}
+                canEdit={canEdit} 
+             />
+        </div>
       ) : (
-        <>
-          <div style={{ marginBottom: '20px', display: 'flex', gap: '15px', flexWrap: 'wrap', alignItems: 'center' }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-              <input
-                type="checkbox"
-                name="noObject"
-                checked={filters.noObject}
-                onChange={handleFilterChange}
-              />
-              No Object
-            </label>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-              <input
-                type="checkbox"
-                name="noDepartment"
-                checked={filters.noDepartment}
-                onChange={handleFilterChange}
-              />
-              No Department
-            </label>
-            <select 
-                name="sortBy" 
-                value={filters.sortBy} 
-                onChange={handleFilterChange}
-                style={{ padding: '5px', border: '1px solid #ccc', borderRadius: '4px' }}
-            >
-              <option value="name">Sort by Name</option>
-              <option value="object">Sort by Object</option>
-              <option value="department">Sort by Department</option>
-            </select>
-            <input
-              type="text"
-              name="search"
-              value={filters.search}
-              placeholder="Search by Name"
-              onChange={handleFilterChange}
-              style={{ padding: '5px', border: '1px solid #ccc', borderRadius: '4px', flex: 1 }}
-            />
+        // Widok Listy
+        <div style={containerStyle}>
+          <h2 style={{ fontSize: '24px', marginBottom: '20px', color: '#333' }}>Lista Pracowników</h2>
+          
+          {/* SEKCJA FILTRÓW */}
+          <div style={cardStyle}>
+            <div style={{ display: 'flex', gap: '15px', flexWrap: 'wrap', alignItems: 'center' }}>
+                {/* Wyszukiwarka */}
+                <div style={{ flex: 1, minWidth: '250px' }}>
+                    <input
+                        type="text"
+                        name="search"
+                        value={filters.search}
+                        placeholder="🔍 Szukaj po nazwisku lub email..."
+                        onChange={handleFilterChange}
+                        style={{ ...inputStyle, width: '100%', boxSizing: 'border-box' }}
+                    />
+                </div>
+
+                {/* Sortowanie */}
+                <select 
+                    name="sortBy" 
+                    value={filters.sortBy} 
+                    onChange={handleFilterChange}
+                    style={inputStyle}
+                >
+                    <option value="name">Sortuj: Nazwisko</option>
+                    <option value="object">Sortuj: Obiekt</option>
+                    <option value="department">Sortuj: Departament</option>
+                </select>
+
+                {/* Checkboxy */}
+                <div style={{ display: 'flex', gap: '15px', fontSize: '14px', color: '#555' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                        <input
+                            type="checkbox"
+                            name="noObject"
+                            checked={filters.noObject}
+                            onChange={handleFilterChange}
+                        />
+                        Tylko bez Obiektu
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                        <input
+                            type="checkbox"
+                            name="noDepartment"
+                            checked={filters.noDepartment}
+                            onChange={handleFilterChange}
+                        />
+                        Tylko bez Departamentu
+                    </label>
+                </div>
+            </div>
           </div>
 
-          <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '20px', backgroundColor: 'white', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }}>
-            <thead style={{ backgroundColor: '#f3f4f6' }}>
-              <tr>
-                <th style={{ border: '1px solid #ddd', padding: '12px', textAlign: 'left' }}>Name</th>
-                <th style={{ border: '1px solid #ddd', padding: '12px', textAlign: 'left' }}>Email</th>
-                <th style={{ border: '1px solid #ddd', padding: '12px', textAlign: 'left' }}>Role</th>
-                <th style={{ border: '1px solid #ddd', padding: '12px', textAlign: 'left' }}>Object</th>
-                <th style={{ border: '1px solid #ddd', padding: '12px', textAlign: 'left' }}>Department</th>
-                <th style={{ border: '1px solid #ddd', padding: '12px', textAlign: 'left' }}>Contract Type</th>
-              </tr>
-            </thead>
-            <tbody>
-              {employees.map((emp, index) => (
-                <tr
-                  key={emp.id}
-                  onClick={() => handleRowClick(index)}
-                  style={{
-                    backgroundColor: highlightedIndex === index ? '#e0e0e0' : 'white',
-                    cursor: canEdit ? 'pointer' : 'default', 
-                    transition: 'background-color 0.2s'
-                  }}
-                  onMouseEnter={(e) => {
-                      if(canEdit) e.currentTarget.style.backgroundColor = '#f9fafb';
-                  }}
-                  onMouseLeave={(e) => {
-                      if(canEdit) e.currentTarget.style.backgroundColor = 'white';
-                  }}
-                >
-                  <td style={{ border: '1px solid #ddd', padding: '8px', fontWeight: 'bold', color: canEdit ? '#2563eb' : 'black' }}>
-                      {emp.name}
-                  </td>
-                  <td style={{ border: '1px solid #ddd', padding: '8px' }}>{emp.email}</td>
-                  <td style={{ border: '1px solid #ddd', padding: '8px' }}>{emp.role}</td>
-                  
-                  <td style={{ border: '1px solid #ddd', padding: '8px' }}>
-                    {emp.object_name || <span style={{color: '#999'}}>-</span>}
-                  </td>
-                  <td style={{ border: '1px solid #ddd', padding: '8px' }}>
-                    {emp.department_name || <span style={{color: '#999'}}>-</span>}
-                  </td>
-                  
-                  <td style={{ border: '1px solid #ddd', padding: '8px' }}>
-                    {emp.contract_type || <span style={{color: '#999'}}>-</span>}
-                  </td>
-                </tr>
-              ))}
-              {employees.length === 0 && (
-                  <tr>
-                      <td colSpan="6" style={{ padding: '20px', textAlign: 'center', color: '#666' }}>
-                          Brak pracowników spełniających kryteria.
-                      </td>
-                  </tr>
-              )}
-            </tbody>
-          </table>
+          {/* TABELA */}
+          <div style={{ ...cardStyle, padding: 0, overflow: 'hidden' }}>
+              <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr>
+                        <th style={thStyle}>Imię i Nazwisko</th>
+                        <th style={thStyle}>Email</th>
+                        <th style={thStyle}>Rola</th>
+                        <th style={thStyle}>Obiekt</th>
+                        <th style={thStyle}>Departament</th>
+                        <th style={thStyle}>Umowa</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {employees.map((emp, index) => (
+                        <tr
+                          key={emp.id}
+                          onClick={() => handleRowClick(index)}
+                          style={{
+                            backgroundColor: highlightedIndex === index ? '#f1f3f5' : 'white',
+                            cursor: canEdit ? 'pointer' : 'default', 
+                            transition: 'background-color 0.1s'
+                          }}
+                          onMouseEnter={(e) => {
+                              if(canEdit) e.currentTarget.style.backgroundColor = '#f8f9fa';
+                          }}
+                          onMouseLeave={(e) => {
+                              if(canEdit) e.currentTarget.style.backgroundColor = 'white';
+                          }}
+                        >
+                          <td style={{ ...tdStyle, fontWeight: '600', color: canEdit ? '#007bff' : '#333' }}>
+                              {emp.name}
+                          </td>
+                          <td style={tdStyle}>{emp.email}</td>
+                          <td style={tdStyle}>
+                              <span style={roleBadgeStyle(emp.role)}>{emp.role}</span>
+                          </td>
+                          
+                          <td style={tdStyle}>
+                            {emp.object_name ? (
+                                <span style={{ fontWeight: '500' }}>{emp.object_name}</span>
+                            ) : (
+                                <span style={{ color: '#dc3545', fontSize: '12px' }}>⚠️ Brak</span>
+                            )}
+                          </td>
+                          <td style={tdStyle}>
+                            {emp.department_name || <span style={{color: '#aaa'}}>-</span>}
+                          </td>
+                          
+                          <td style={tdStyle}>
+                            {emp.contract_type || <span style={{color: '#aaa'}}>-</span>}
+                          </td>
+                        </tr>
+                      ))}
+                      {employees.length === 0 && (
+                          <tr>
+                              <td colSpan="6" style={{ padding: '40px', textAlign: 'center', color: '#6c757d' }}>
+                                  Brak pracowników spełniających kryteria wyszukiwania.
+                              </td>
+                          </tr>
+                      )}
+                    </tbody>
+                  </table>
+              </div>
+          </div>
 
-          <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          {/* PAGINACJA */}
+          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '20px', marginTop: '10px' }}>
             <button
               onClick={() => handlePageChange(filters.page - 1)}
               disabled={filters.page <= 1}
-              style={{ padding: '8px 16px', cursor: filters.page <= 1 ? 'not-allowed' : 'pointer', backgroundColor: '#e5e7eb', border: 'none', borderRadius: '4px' }}
+              style={{ 
+                  padding: '8px 16px', borderRadius: '4px', border: '1px solid #dee2e6',
+                  backgroundColor: filters.page <= 1 ? '#e9ecef' : 'white',
+                  color: filters.page <= 1 ? '#adb5bd' : '#007bff',
+                  cursor: filters.page <= 1 ? 'not-allowed' : 'pointer'
+              }}
             >
-              Previous
+              &larr; Poprzednia
             </button>
-            <span>
-              Page {filters.page} of {totalPages}
+            <span style={{ fontSize: '14px', color: '#555' }}>
+              Strona <b>{filters.page}</b> z {totalPages}
             </span>
             <button
               onClick={() => handlePageChange(filters.page + 1)}
               disabled={filters.page >= totalPages}
-              style={{ padding: '8px 16px', cursor: filters.page >= totalPages ? 'not-allowed' : 'pointer', backgroundColor: '#e5e7eb', border: 'none', borderRadius: '4px' }}
+              style={{ 
+                  padding: '8px 16px', borderRadius: '4px', border: '1px solid #dee2e6',
+                  backgroundColor: filters.page >= totalPages ? '#e9ecef' : 'white',
+                  color: filters.page >= totalPages ? '#adb5bd' : '#007bff',
+                  cursor: filters.page >= totalPages ? 'not-allowed' : 'pointer'
+              }}
             >
-              Next
+              Następna &rarr;
             </button>
           </div>
-        </>
+
+        </div>
       )}
     </div>
   );

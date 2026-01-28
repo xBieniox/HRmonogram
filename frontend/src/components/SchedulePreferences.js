@@ -29,7 +29,7 @@ const SchedulePreferences = ({ token }) => {
     if (objectId && token) {
         fetchData();
     }
-    // eslint-disable-next-line
+  
   }, [objectId, token, navigate]);
 
   const fetchData = async () => {

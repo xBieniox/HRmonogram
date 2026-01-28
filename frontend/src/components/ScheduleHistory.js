@@ -17,7 +17,7 @@ const ScheduleHistory = ({ token }) => {
 
   useEffect(() => {
     fetchHistory();
-    // eslint-disable-next-line
+    
   }, [objectId]);
 
   const fetchHistory = async () => {
