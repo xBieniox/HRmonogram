@@ -1,22 +1,51 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from app import db
-# WAŻNE: Dodano ShiftTemplate do importów
 from app.models import Schedule, User, WorkSchedule, ShiftPreference, ShiftTemplate
 from datetime import datetime, timedelta
 from sqlalchemy import desc, extract
 from app.routes.labor_code_validator import LaborCodeValidator 
 import json
+import calendar
 
 bp = Blueprint('schedules', __name__)
 
-# --- 1. POBIERANIE DANYCH DO KALENDARZA ---
+def calculate_schedule_dates(ws):
+    prefs = ws.get_preferences()
+    sched_type = 'monthly'
+    if prefs and 'schedule_type' in prefs:
+        sched_type = prefs['schedule_type']
+    elif ws.shift_preference:
+        sched_type = ws.shift_preference.schedule_type
+
+    start = ws.start_date
+    if sched_type == 'weekly':
+        end = start + timedelta(days=6)
+    else:
+        last_day = calendar.monthrange(start.year, start.month)[1]
+        end = start.replace(day=last_day)
+    
+    return start, end, sched_type
+
+def get_schedule_templates(ws):
+    # 1. Próbujemy pobrać ze snapshota (grafik historyczny/zatwierdzony)
+    templates = ws.get_templates()
+    
+    # 2. Jeśli brak (stary grafik), pobieramy aktualne z bazy
+    if not templates:
+        db_templates = ShiftTemplate.query.filter_by(object_id=ws.object_id).all()
+        templates = [{
+            "abbreviation": t.abbreviation,
+            "start_time": t.start_time,
+            "end_time": t.end_time
+        } for t in db_templates]
+    return templates
+
 @bp.route('/schedules/<int:object_id>/<string:month>', methods=['GET'])
 @jwt_required()
 def get_monthly_schedules(object_id, month):
     try:
         year, m = map(int, month.split('-'))
-        
         schedules = Schedule.query.filter(
             Schedule.object_id == object_id,
             extract('year', Schedule.date) == year,
@@ -35,27 +64,17 @@ def get_monthly_schedules(object_id, month):
     except ValueError:
         return jsonify(message="Invalid date format"), 400
 
-
-# --- 2. POBIERANIE LISTY GRAFIKÓW ---
 @bp.route('/schedules/active/<int:object_id>', methods=['GET'])
 @jwt_required()
 def get_active_schedules(object_id):
     today = datetime.now().date()
+    view_mode = request.args.get('view', 'active') 
     
     all_schedules = WorkSchedule.query.filter_by(object_id=object_id).order_by(desc(WorkSchedule.start_date)).all()
     
     results = []
     for ws in all_schedules:
-        sched_type = ws.shift_preference.schedule_type if ws.shift_preference else 'monthly'
-        start = ws.start_date
-        
-        end_date = None
-        if sched_type == 'weekly':
-             end_date = start + timedelta(days=6)
-        else:
-             import calendar
-             last_day = calendar.monthrange(start.year, start.month)[1]
-             end_date = start.replace(day=last_day)
+        start, end_date, sched_type = calculate_schedule_dates(ws)
         
         status = "archived"
         if start <= today <= end_date:
@@ -63,20 +82,47 @@ def get_active_schedules(object_id):
         elif start > today:
             status = "future"
 
-        results.append({
-            "id": ws.id,
-            "title": ws.title,
-            "type": sched_type,
-            "start_date": start.strftime('%Y-%m-%d'),
-            "end_date": end_date.strftime('%Y-%m-%d'),
-            "status": status,
-            "is_published": ws.is_published
-        })
+        should_include = False
+        if view_mode == 'history':
+            if status == 'archived':
+                should_include = True
+        else:
+            if status in ['active', 'future']:
+                should_include = True
+
+        if should_include:
+            results.append({
+                "id": ws.id,
+                "title": ws.title,
+                "type": sched_type,
+                "start_date": start.strftime('%Y-%m-%d'),
+                "end_date": end_date.strftime('%Y-%m-%d'),
+                "status": status,
+                "is_published": ws.is_published
+            })
 
     return jsonify(results)
 
+@bp.route('/work_schedules/<int:schedule_id>', methods=['GET'])
+@jwt_required()
+def get_work_schedule_details(schedule_id):
+    ws = WorkSchedule.query.get_or_404(schedule_id)
+    start, end_date, sched_type = calculate_schedule_dates(ws)
 
-# --- 3. MASOWY ZAPIS (ZATWIERDZANIE GRAFIKU) ---
+    shifts_map = {}
+    for s in ws.shifts:
+        key = f"{s.employee_id}_{s.date.strftime('%Y-%m-%d')}"
+        shifts_map[key] = s.shift
+
+    return jsonify({
+        "id": ws.id,
+        "title": ws.title,
+        "type": sched_type,
+        "start_date": ws.start_date.strftime('%Y-%m-%d'),
+        "end_date": end_date.strftime('%Y-%m-%d'),
+        "shifts": shifts_map
+    })
+
 @bp.route('/schedules/bulk_save', methods=['POST'])
 @jwt_required()
 def bulk_save_schedule():
@@ -93,20 +139,19 @@ def bulk_save_schedule():
     try:
         current_identity = get_jwt_identity()
         creator_id = None
-        # ... (Logika pobierania creator_id bez zmian - skopiuj ze starego kodu lub zostaw jak jest) ...
-        if isinstance(current_identity, dict): creator_id = current_identity.get('id')
-        elif isinstance(current_identity, int): creator_id = current_identity
+
+        if isinstance(current_identity, dict):
+            creator_id = current_identity.get('id')
+        elif isinstance(current_identity, int):
+            creator_id = current_identity
         elif isinstance(current_identity, str):
-             user = User.query.filter_by(email=current_identity).first()
-             if user: creator_id = user.id
-        # ...
+            user = User.query.filter_by(email=current_identity).first()
+            if user: creator_id = user.id
 
         start_dt = datetime.strptime(start_date_str, '%Y-%m-%d').date()
 
-        # A. Pobierz GLOBALNE Preferencje (Master) - potrzebne przy tworzeniu
         pref = ShiftPreference.query.filter_by(object_id=forced_object_id).first()
         if not pref:
-            # Tworzymy domyślne jeśli nie istnieją, żeby system nie padł
             pref = ShiftPreference(object_id=forced_object_id)
             db.session.add(pref)
             db.session.flush()
@@ -114,25 +159,23 @@ def bulk_save_schedule():
         work_schedule = None
 
         if schedule_id:
-            # --- TRYB EDYCJI ---
             work_schedule = WorkSchedule.query.get(schedule_id)
-            if not work_schedule: return jsonify(message="Grafik nie znaleziony"), 404
+            if not work_schedule:
+                return jsonify(message="Grafik nie został znaleziony."), 404
             
-            # W edycji NIE NADPISUJEMY snapshota. Grafik pamięta swoje zasady.
-            # Jedynie aktualizujemy nazwę/datę jeśli trzeba
             if work_schedule.title != schedule_name:
-                dup = WorkSchedule.query.filter_by(object_id=forced_object_id, title=schedule_name).first()
-                if dup: return jsonify(message=f"Nazwa '{schedule_name}' zajęta!"), 409
+                duplicate = WorkSchedule.query.filter_by(object_id=forced_object_id, title=schedule_name).first()
+                if duplicate:
+                    return jsonify(message=f"Nazwa '{schedule_name}' jest już zajęta w tym obiekcie!"), 409
             
             work_schedule.title = schedule_name
             work_schedule.start_date = start_dt
         
         else:
-            # --- TRYB TWORZENIA (TWORZYMY MIGAWKĘ) ---
             existing = WorkSchedule.query.filter_by(object_id=forced_object_id, title=schedule_name).first()
-            if existing: return jsonify(message=f"Grafik '{schedule_name}' już istnieje!"), 409
+            if existing:
+                return jsonify(message=f"Grafik o nazwie '{schedule_name}' już istnieje w tym obiekcie!"), 409
 
-            # 1. Przygotuj dane do snapshota (JSON)
             snapshot_pref_data = {
                 "schedule_type": pref.schedule_type,
                 "daily_hours_limit": pref.daily_hours_limit,
@@ -141,7 +184,6 @@ def bulk_save_schedule():
                 "work_days": pref.get_work_days()
             }
             
-            # 2. Pobierz aktualne szablony i zrób z nich snapshota
             current_templates = ShiftTemplate.query.filter_by(object_id=forced_object_id).all()
             snapshot_templates_data = [{
                 "abbreviation": t.abbreviation,
@@ -155,16 +197,12 @@ def bulk_save_schedule():
                 start_date=start_dt,
                 shift_preference_id=pref.id,
                 created_by=creator_id,
-                # ZAPISUJEMY JSONY:
                 snapshot_preferences=json.dumps(snapshot_pref_data),
                 snapshot_templates=json.dumps(snapshot_templates_data)
             )
             db.session.add(work_schedule)
             db.session.flush()
 
-        # C. Zapis zmian (shifts) - BEZ ZMIAN w logice
-        # ... (Skopiuj pętlę for key, shift_val in shifts_data.items() z poprzedniego kodu) ...
-        # Dla pewności wklejam skróconą wersję:
         for key, shift_val in shifts_data.items():
             try:
                 parts = key.split('_')
@@ -183,24 +221,24 @@ def bulk_save_schedule():
                 if entry:
                     entry.shift = val_str
                     entry.object_id = forced_object_id
-                    entry.work_schedule_id = work_schedule.id
+                    entry.work_schedule_id = work_schedule.id 
                 else:
                     new_entry = Schedule(
-                        employee_id=employee_id, date=target_date, shift=val_str,
-                        object_id=forced_object_id, work_schedule_id=work_schedule.id
+                        employee_id=employee_id,
+                        date=target_date,
+                        shift=val_str,
+                        object_id=forced_object_id,
+                        work_schedule_id=work_schedule.id 
                     )
                     db.session.add(new_entry)
         
         db.session.commit()
-        return jsonify(message="Schedule saved", schedule_id=work_schedule.id), 200
+        return jsonify(message="Schedule saved successfully", schedule_id=work_schedule.id), 200
 
     except Exception as e:
         db.session.rollback()
-        print(f"Error: {e}")
-        return jsonify(message=f"Error: {str(e)}"), 500
+        return jsonify(message=f"Server error: {str(e)}"), 500
 
-
-# --- 4. POJEDYNCZA EDYCJA ---
 @bp.route('/schedules/update', methods=['POST'])
 @jwt_required()
 def update_schedule_entry():
@@ -255,24 +293,42 @@ def update_schedule_entry():
         db.session.rollback()
         return jsonify(message=str(e)), 500
 
-
-# --- 5. PUBLIKACJA ---
 @bp.route('/schedules/<int:schedule_id>/publish', methods=['PUT'])
 @jwt_required()
 def toggle_publish_schedule(schedule_id):
-    schedule = WorkSchedule.query.get_or_404(schedule_id)
-    new_status = not schedule.is_published
-    schedule.is_published = new_status
+    target_schedule = WorkSchedule.query.get_or_404(schedule_id)
+    
+    if not target_schedule.is_published:
+        t_start, t_end, _ = calculate_schedule_dates(target_schedule)
+        
+        overlapping_schedules = WorkSchedule.query.filter(
+            WorkSchedule.object_id == target_schedule.object_id,
+            WorkSchedule.is_published == True,
+            WorkSchedule.id != target_schedule.id
+        ).all()
+
+        for existing in overlapping_schedules:
+            e_start, e_end, _ = calculate_schedule_dates(existing)
+            
+            if t_start <= e_end and t_end >= e_start:
+                target_emp_ids = {s.employee_id for s in target_schedule.shifts}
+                existing_emp_ids = {s.employee_id for s in existing.shifts}
+                
+                common_employees = target_emp_ids.intersection(existing_emp_ids)
+                
+                if common_employees:
+                    return jsonify(
+                        message=f"Konflikt! Pracownicy powtarzają się w innym opublikowanym grafiku: '{existing.title}' w tym samym czasie ({e_start} - {e_end})."
+                    ), 409
+
+    target_schedule.is_published = not target_schedule.is_published
     db.session.commit()
-    status_msg = "opublikowany" if new_status else "ukryty (szkic)"
-    return jsonify(message=f"Grafik został {status_msg}.", is_published=new_status), 200
+    status_msg = "opublikowany" if target_schedule.is_published else "ukryty (szkic)"
+    return jsonify(message=f"Grafik został {status_msg}.", is_published=target_schedule.is_published), 200
 
-
-# --- 6. POBIERANIE USTAWIEŃ I SZABLONÓW ---
 @bp.route('/schedules/settings/<int:object_id>', methods=['GET'])
 @jwt_required()
 def get_schedule_settings(object_id):
-    # 1. Pobierz preferencje
     pref = ShiftPreference.query.filter_by(object_id=object_id).first()
     
     pref_data = {
@@ -292,7 +348,6 @@ def get_schedule_settings(object_id):
             "holidays_included": pref.holidays_included
         }
 
-    # 2. Pobierz szablony
     templates = ShiftTemplate.query.filter_by(object_id=object_id).all()
     templates_data = [{
         "id": t.id,
@@ -306,8 +361,6 @@ def get_schedule_settings(object_id):
         "templates": templates_data
     })
 
-
-# --- 7. ZAPISYWANIE USTAWIEŃ I SZABLONÓW ---
 @bp.route('/schedules/settings/<int:object_id>', methods=['POST'])
 @jwt_required()
 def save_schedule_settings(object_id):
@@ -318,7 +371,6 @@ def save_schedule_settings(object_id):
     if not pref_data:
         return jsonify(message="Brak danych preferencji"), 400
 
-    # 1. Zapis Preferencji
     pref = ShiftPreference.query.filter_by(object_id=object_id).first()
     if not pref:
         pref = ShiftPreference(object_id=object_id)
@@ -330,7 +382,6 @@ def save_schedule_settings(object_id):
     pref.holidays_included = pref_data.get('holidays_included', False)
     pref.set_work_days(pref_data.get('work_days', [])) 
 
-    # 2. Zapis Szablonów (Usuń stare, dodaj nowe)
     existing_templates = ShiftTemplate.query.filter_by(object_id=object_id).all()
     for t in existing_templates:
         db.session.delete(t)
@@ -347,28 +398,18 @@ def save_schedule_settings(object_id):
     db.session.commit()
     return jsonify(message="Ustawienia zapisane pomyślnie"), 200
 
-# --- 8. POBIERANIE KONFIGURACJI DLA EDYTORA (Context) ---
 @bp.route('/schedules/context', methods=['GET'])
 @jwt_required()
 def get_schedule_context():
-    """
-    Zwraca ustawienia i szablony odpowiednie dla danego kontekstu.
-    Jeśli podano schedule_id -> zwraca dane ze SNAPSHOTA tego grafiku.
-    Jeśli podano object_id (i brak schedule_id) -> zwraca dane GLOBALNE (Master).
-    """
     object_id = request.args.get('object_id')
     schedule_id = request.args.get('schedule_id')
 
-    # A. EDYCJA ISTNIEJĄCEGO GRAFIKU (Priorytet)
     if schedule_id:
         schedule = WorkSchedule.query.get(schedule_id)
         if schedule:
-            # Próbujemy pobrać snapshota
             prefs = schedule.get_preferences()
             templates = schedule.get_templates()
             
-            # Fallback: Jeśli grafik jest stary i nie ma snapshota (stworzony przed tą zmianą),
-            # pobieramy aktualne globalne ustawienia
             if not prefs or not templates:
                 current_pref = ShiftPreference.query.filter_by(object_id=schedule.object_id).first()
                 current_templates = ShiftTemplate.query.filter_by(object_id=schedule.object_id).all()
@@ -392,7 +433,6 @@ def get_schedule_context():
                 "templates": templates
             })
 
-    # B. TWORZENIE NOWEGO GRAFIKU (Pobieramy Globalne)
     if object_id:
         pref = ShiftPreference.query.filter_by(object_id=object_id).first()
         templates_db = ShiftTemplate.query.filter_by(object_id=object_id).all()
@@ -418,3 +458,142 @@ def get_schedule_context():
         })
 
     return jsonify(message="Missing params"), 400
+
+@bp.route('/schedules/<int:schedule_id>', methods=['DELETE'])
+@jwt_required()
+def delete_work_schedule(schedule_id):
+    work_schedule = WorkSchedule.query.get_or_404(schedule_id)
+    try:
+        db.session.delete(work_schedule)
+        db.session.commit()
+        return jsonify(message="Grafik został pomyślnie usunięty."), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify(message=f"Błąd serwera: {str(e)}"), 500
+
+# --- DLA PRACOWNIKA: Pobieranie listy dostępnych grafików (Historia / Nadchodzące) ---
+@bp.route('/schedules/my-list', methods=['GET'])
+@jwt_required()
+def get_my_schedules_list():
+    current_identity = get_jwt_identity()
+    user_id = current_identity.get('id') if isinstance(current_identity, dict) else current_identity
+    user = User.query.get(user_id)
+    
+    if not user or not user.object_id:
+        return jsonify(message="Brak obiektu"), 404
+
+    schedules = WorkSchedule.query.filter_by(
+        object_id=user.object_id, is_published=True
+    ).order_by(desc(WorkSchedule.start_date)).all()
+
+    today = datetime.now().date()
+    response_data = { "current": [], "upcoming": [], "history": [] }
+
+    for ws in schedules:
+        t_start, t_end, _ = calculate_schedule_dates(ws)
+        
+        item = {
+            "id": ws.id,
+            "title": ws.title,
+            "start_date": t_start.strftime('%Y-%m-%d'),
+            "end_date": t_end.strftime('%Y-%m-%d')
+        }
+
+        if t_start <= today <= t_end:
+            response_data["current"].append(item)
+        elif t_start > today:
+            response_data["upcoming"].append(item)
+        else:
+            response_data["history"].append(item)
+
+    return jsonify(response_data)
+
+# --- DLA PRACOWNIKA: Pobieranie konkretnego grafiku (z walidacją dostępu) ---
+@bp.route('/schedules/employee-view/<int:schedule_id>', methods=['GET'])
+@jwt_required()
+def get_employee_schedule_details(schedule_id):
+    current_identity = get_jwt_identity()
+    user_id = current_identity.get('id') if isinstance(current_identity, dict) else current_identity
+    user = User.query.get(user_id)
+
+    ws = WorkSchedule.query.get_or_404(schedule_id)
+
+    # Zabezpieczenie: Pracownik widzi tylko SWÓJ obiekt i tylko OPUBLIKOWANE
+    if ws.object_id != user.object_id or not ws.is_published:
+        return jsonify(message="Brak dostępu do tego grafiku."), 403
+
+    t_start, t_end, _ = calculate_schedule_dates(ws)
+    
+    shifts_map = {}
+    for s in ws.shifts:
+        key = f"{s.employee_id}_{s.date.strftime('%Y-%m-%d')}"
+        shifts_map[key] = s.shift
+
+    employees = User.query.filter_by(object_id=user.object_id).all()
+    employees_list = [{"id": e.id, "name": e.name} for e in employees]
+    
+    # Pobieramy legendę (szablony)
+    templates = get_schedule_templates(ws)
+
+    return jsonify({
+        "id": ws.id,
+        "title": ws.title,
+        "start_date": t_start.strftime('%Y-%m-%d'),
+        "end_date": t_end.strftime('%Y-%m-%d'),
+        "shifts": shifts_map,
+        "employees": employees_list,
+        "templates": templates, # Legenda
+        "user_id": user.id
+    })
+
+# --- DLA PRACOWNIKA: Pobieranie aktualnego (domyślnego) ---
+@bp.route('/schedules/my-current', methods=['GET'])
+@jwt_required()
+def get_my_current_schedule():
+    current_identity = get_jwt_identity()
+    user_id = current_identity.get('id') if isinstance(current_identity, dict) else current_identity
+    
+    user = User.query.get(user_id)
+    if not user or not user.object_id:
+        return jsonify(message="Nie jesteś przypisany do żadnego obiektu."), 404
+
+    schedules = WorkSchedule.query.filter_by(
+        object_id=user.object_id, 
+        is_published=True
+    ).order_by(desc(WorkSchedule.start_date)).all()
+
+    today = datetime.now().date()
+    active_schedule = None
+    active_end_date = None
+    
+    for ws in schedules:
+        t_start, t_end, _ = calculate_schedule_dates(ws)
+        if t_start <= today <= t_end:
+            active_schedule = ws
+            active_end_date = t_end
+            break
+    
+    if not active_schedule:
+        return jsonify(message="Brak opublikowanego grafiku na bieżący okres."), 404
+
+    shifts_map = {}
+    for s in active_schedule.shifts:
+        key = f"{s.employee_id}_{s.date.strftime('%Y-%m-%d')}"
+        shifts_map[key] = s.shift
+
+    employees = User.query.filter_by(object_id=user.object_id).all()
+    employees_list = [{"id": e.id, "name": e.name} for e in employees]
+    
+    # Dodajemy legendę
+    templates = get_schedule_templates(active_schedule)
+
+    return jsonify({
+        "id": active_schedule.id,
+        "title": active_schedule.title,
+        "start_date": active_schedule.start_date.strftime('%Y-%m-%d'),
+        "end_date": active_end_date.strftime('%Y-%m-%d'),
+        "shifts": shifts_map,
+        "user_id": user.id,
+        "employees": employees_list,
+        "templates": templates 
+    })

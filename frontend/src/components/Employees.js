@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import UserDetails from './UserDetails';
 import { useNavigate } from 'react-router-dom';
+import { getUserRole } from '../authUtils';
 
 const Employees = ({ token }) => {
   const [employees, setEmployees] = useState([]);
@@ -17,47 +18,25 @@ const Employees = ({ token }) => {
   
   const navigate = useNavigate();
   
-  // --- 1. SPRAWDZANIE UPRAWNIEŃ ---
   const [userRole, setUserRole] = useState(null);
-  const [authChecked, setAuthChecked] = useState(false); // Flaga, czy sprawdzono rolę
+  const [authChecked, setAuthChecked] = useState(false);
 
   useEffect(() => {
     if (token) {
-      const role = getRoleFromToken(token);
+      const role = getUserRole(token);
       setUserRole(role);
       
-      // ZABEZPIECZENIE: Jeśli to zwykły pracownik -> wyrzuć
       if (role === 'employee') {
           navigate('/');
       } else {
-          setAuthChecked(true); // Pozwalamy na renderowanie
+          setAuthChecked(true);
       }
     }
   }, [token, navigate]);
 
-  const getRoleFromToken = (jwtToken) => {
-    try {
-      const base64Url = jwtToken.split('.')[1];
-      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-      const jsonPayload = decodeURIComponent(window.atob(base64).split('').map(function(c) {
-          return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-      }).join(''));
-      const payload = JSON.parse(jsonPayload);
-      if (payload.sub && payload.sub.role) {
-          return payload.sub.role;
-      }
-      return null;
-    } catch (e) {
-      console.error("Błąd dekodowania tokena:", e);
-      return null;
-    }
-  };
-
   const canEdit = userRole === 'admin' || userRole === 'global_hr';
-  // -------------------------------------------------------------------
 
   useEffect(() => {
-    // Pobieraj dane tylko jeśli rola została sprawdzona i jest poprawna
     if (authChecked) {
         fetchEmployees();
     }
@@ -89,7 +68,7 @@ const Employees = ({ token }) => {
       setTotalPages(data.pages);
       setHighlightedIndex(-1);
     } catch (error) {
-      console.error('Error fetching employees:', error);
+      console.error(error);
     }
   };
 
@@ -107,7 +86,7 @@ const Employees = ({ token }) => {
   };
 
   const handleKeyDown = (e) => {
-    if (!canEdit) return; // Blokada dla Local HR
+    if (!canEdit) return;
 
     if (e.key === 'ArrowUp') {
       setHighlightedIndex((prev) => Math.max(prev - 1, 0));
@@ -119,7 +98,7 @@ const Employees = ({ token }) => {
   };
 
   const handleRowClick = (index) => {
-    if (!canEdit) return; // Blokada dla Local HR
+    if (!canEdit) return;
     setSelectedUser(employees[index].id);
   };
 
@@ -128,7 +107,6 @@ const Employees = ({ token }) => {
       fetchEmployees(); 
   };
 
-  // Jeśli rola jeszcze nie sprawdzona lub użytkownik nieuprawniony -> nie renderuj nic
   if (!authChecked) return null;
 
   return (

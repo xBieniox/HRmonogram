@@ -1,221 +1,138 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { hasAccess } from '../authUtils';
 
 const ScheduleHistory = ({ token }) => {
   const { objectId } = useParams();
   const navigate = useNavigate();
-  
-  const [historyList, setHistoryList] = useState([]);
-  const [selectedSchedule, setSelectedSchedule] = useState(null); // Tutaj trzymamy szczegóły otwartego grafiku
-  const [employees, setEmployees] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [schedules, setSchedules] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  // Pobierz listę przy wejściu
+  useEffect(() => {
+      if (!hasAccess(token, ['admin', 'global_hr', 'local_hr'], objectId)) {
+          alert("Brak uprawnień do tego zasobu.");
+          navigate('/');
+      }
+  }, [token, navigate, objectId]);
+
   useEffect(() => {
     fetchHistory();
-    fetchEmployees();
+    // eslint-disable-next-line
   }, [objectId]);
 
   const fetchHistory = async () => {
     try {
-      const response = await fetch(`http://127.0.0.1:5000/schedules/active/${objectId}`, {
-        headers: { Authorization: `Bearer ${token}` }
+      const response = await fetch(`http://127.0.0.1:5000/schedules/active/${objectId}?view=history`, {
+        headers: { Authorization: `Bearer ${token}` },
       });
       if (response.ok) {
         const data = await response.json();
-        setHistoryList(data);
+        setSchedules(data);
       }
-    } catch (err) { console.error(err); }
-  };
-
-  const fetchEmployees = async () => {
-      try {
-        const response = await fetch(`http://127.0.0.1:5000/objects/${objectId}/employees`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (response.ok) {
-          const data = await response.json();
-          setEmployees(Array.isArray(data) ? data : data.employees);
-        }
-      } catch (err) { console.error(err); }
-  };
-
-  // Pobierz szczegóły konkretnego grafiku (shifts)
-  const openSchedule = async (scheduleId) => {
-      setLoading(true);
-      try {
-          const response = await fetch(`http://127.0.0.1:5000/work_schedules/${scheduleId}`, {
-              headers: { Authorization: `Bearer ${token}` }
-          });
-          if (response.ok) {
-              const data = await response.json();
-              setSelectedSchedule(data);
-          }
-      } catch (err) {
-          alert("Błąd pobierania szczegółów grafiku");
-      } finally {
-          setLoading(false);
-      }
+    } catch (error) {
+      console.error(error);
+    } finally {
+        setLoading(false);
+    }
   };
 
   const handleDelete = async (scheduleId) => {
-      if (!window.confirm("⚠️ CZY NA PEWNO CHCESZ USUNĄĆ TEN GRAFIK?\n\nTa operacja jest nieodwracalna i usunie wszystkie przypisane do niego zmiany pracowników.")) {
-          return;
-      }
-      
-      try {
-          const response = await fetch(`http://127.0.0.1:5000/work_schedules/${scheduleId}`, {
-              method: 'DELETE',
-              headers: { Authorization: `Bearer ${token}` }
-          });
-          if (response.ok) {
-              alert("✅ Grafik usunięty.");
-              setSelectedSchedule(null); // Wróć do listy
-              fetchHistory(); // Odśwież listę
-          } else {
-              alert("Błąd usuwania.");
-          }
-      } catch (err) { console.error(err); }
-  };
-
-
-const handleEdit = () => {
-    if (selectedSchedule) {
-        // Przekierowanie do trasy, którą stworzyliśmy w Kroku 1
-        navigate(`/schedule/edit/${objectId}/${selectedSchedule.id}`);
+    if (!window.confirm("⚠️ Czy na pewno chcesz trwale usunąć ten archiwalny grafik? Operacja jest nieodwracalna.")) return;
+    
+    try {
+        const res = await fetch(`http://127.0.0.1:5000/schedules/${scheduleId}`, {
+            method: 'DELETE',
+            headers: { Authorization: `Bearer ${token}` }
+        });
+        
+        if (res.ok) {
+            setSchedules(prev => prev.filter(s => s.id !== scheduleId));
+            alert("Grafik został usunięty z archiwum.");
+        } else {
+            const data = await res.json();
+            alert("Błąd: " + (data.message || "Nie udało się usunąć."));
+        }
+    } catch (e) { 
+        console.error(e);
+        alert("Błąd połączenia z serwerem.");
     }
-};
-
-  // --- GENEROWANIE SIATKI (Podgląd) ---
-  const renderPreviewGrid = () => {
-      if (!selectedSchedule) return null;
-
-      // Generujemy dni na podstawie start_date i end_date
-      const start = new Date(selectedSchedule.start_date);
-      const end = new Date(selectedSchedule.end_date);
-      const days = [];
-      for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-          days.push(new Date(d));
-      }
-
-      return (
-          <div style={{ overflowX: 'auto', marginTop: '20px', border: '1px solid #ddd' }}>
-              <table border="1" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px', textAlign: 'center' }}>
-                  <thead>
-                      <tr style={{ background: '#f0f0f0' }}>
-                          <th style={{ padding: '8px', minWidth: '150px', position: 'sticky', left: 0, background: '#f0f0f0', zIndex: 10 }}>Pracownik</th>
-                          {days.map((day, i) => (
-                              <th key={i} style={{ minWidth: '40px', padding: '4px' }}>
-                                  {day.getDate()}<br/>
-                                  <span style={{fontSize: '10px', color: '#666'}}>
-                                      {day.toLocaleDateString('pl-PL', { weekday: 'short' })}
-                                  </span>
-                              </th>
-                          ))}
-                      </tr>
-                  </thead>
-                  <tbody>
-                      {employees.map(emp => (
-                          <tr key={emp.id}>
-                              <td style={{ padding: '5px', fontWeight: 'bold', textAlign: 'left', position: 'sticky', left: 0, background: 'white', zIndex: 5 }}>
-                                  {emp.name}
-                              </td>
-                              {days.map((day, i) => {
-                                  const dateStr = day.toISOString().split('T')[0];
-                                  const key = `${emp.id}_${dateStr}`;
-                                  const shift = selectedSchedule.shifts[key] || "";
-                                  
-                                  return (
-                                      <td key={i} style={{ padding: '0', height: '30px', background: shift ? '#e6f7ff' : 'white' }}>
-                                          {shift}
-                                      </td>
-                                  );
-                              })}
-                          </tr>
-                      ))}
-                  </tbody>
-              </table>
-          </div>
-      );
   };
 
-  // --- WIDOK LISTY ---
-  if (!selectedSchedule) {
-      return (
-          <div style={{ padding: '20px' }}>
-              <h2 className="text-2xl font-bold mb-6">Historia Grafików</h2>
-              
-              {loading && <p>Ładowanie...</p>}
+  if (loading) return <div>Ładowanie archiwum...</div>;
 
-              {historyList.length === 0 && !loading && <p>Brak zapisanych grafików.</p>}
-
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '20px' }}>
-                  {historyList.map(item => (
-                      <div 
-                          key={item.id} 
-                          onClick={() => openSchedule(item.id)}
-                          style={{ 
-                              border: '1px solid #ddd', borderRadius: '8px', padding: '15px', 
-                              cursor: 'pointer', background: 'white', boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-                              transition: 'transform 0.2s', position: 'relative'
-                          }}
-                          onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-3px)'}
-                          onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
-                      >
-                          <div style={{ position: 'absolute', top: '10px', right: '10px' }}>
-                              <span style={{ 
-                                  padding: '4px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: 'bold',
-                                  backgroundColor: item.status === 'active' ? '#d4edda' : (item.status === 'future' ? '#cce5ff' : '#e2e3e5'),
-                                  color: item.status === 'active' ? '#155724' : (item.status === 'future' ? '#004085' : '#383d41')
-                              }}>
-                                  {item.status === 'active' ? 'AKTUALNY' : (item.status === 'future' ? 'PRZYSZŁY' : 'ARCHIWALNY')}
-                              </span>
-                          </div>
-                          <h3 style={{ fontSize: '18px', fontWeight: 'bold', marginTop: '15px' }}>{item.title}</h3>
-                          <p style={{ color: '#666', marginTop: '5px' }}>
-                              📅 {item.start_date} ➝ {item.end_date}
-                          </p>
-                          <p style={{ fontSize: '12px', color: '#999', marginTop: '10px' }}>
-                              Typ: {item.type === 'monthly' ? 'Miesięczny' : 'Tygodniowy'}
-                          </p>
-                      </div>
-                  ))}
-              </div>
-          </div>
-      );
-  }
-
-  // --- WIDOK SZCZEGÓŁÓW ---
   return (
-      <div style={{ padding: '20px', background: '#fcfcfc', minHeight: '100vh' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <button onClick={() => setSelectedSchedule(null)} style={{ cursor: 'pointer', background: 'transparent', border: 'none', fontSize: '16px', color: '#007bff' }}>
-                  ← Wróć do listy
-              </button>
-              
-              <div style={{ display: 'flex', gap: '10px' }}>
-                  <button 
-                      onClick={handleEdit}
-                      style={{ padding: '8px 16px', background: '#ffc107', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
-                  >
-                      ✏️ Edytuj
-                  </button>
-                  <button 
-                      onClick={() => handleDelete(selectedSchedule.id)}
-                      style={{ padding: '8px 16px', background: '#dc3545', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
-                  >
-                      🗑️ Usuń grafik
-                  </button>
-              </div>
-          </div>
-
-          <div style={{ background: 'white', padding: '20px', border: '1px solid #ddd', borderRadius: '8px' }}>
-              <h2 className="text-2xl font-bold">{selectedSchedule.title}</h2>
-              <p className="text-gray-600">Zakres: {selectedSchedule.start_date} - {selectedSchedule.end_date}</p>
-              
-              {renderPreviewGrid()}
-          </div>
+    <div style={{ padding: '20px', maxWidth: '1000px', margin: '0 auto' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '2px solid #eee', paddingBottom: '10px' }}>
+        <h2 style={{ margin: 0, color: '#666' }}>Archiwum Grafików</h2>
+        
+        <button 
+            onClick={() => navigate(`/schedules/${objectId}`)}
+            style={{ padding: '8px 15px', background: '#007bff', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+        >
+            &larr; Wróć do aktualnych
+        </button>
       </div>
+
+      {schedules.length === 0 ? (
+          <div style={{ textAlign: 'center', color: '#999', marginTop: '50px' }}>
+              Brak archiwalnych grafików.
+          </div>
+      ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '20px' }}>
+            {schedules.map((sched) => (
+              <div 
+                key={sched.id} 
+                style={{ 
+                    background: '#f9f9f9', 
+                    border: '1px solid #e0e0e0', 
+                    borderRadius: '8px', 
+                    padding: '20px',
+                    color: '#555',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between'
+                }}
+              >
+                <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '10px' }}>
+                        <h3 style={{ margin: 0, fontSize: '18px' }}>{sched.title}</h3>
+                        <span style={{ 
+                            fontSize: '11px', padding: '2px 6px', borderRadius: '4px',
+                            background: '#eee', border: '1px solid #ccc'
+                        }}>
+                            Archiwum
+                        </span>
+                    </div>
+                    
+                    <p style={{ margin: '5px 0', fontSize: '14px' }}>
+                        📅 {sched.start_date} - {sched.end_date}
+                    </p>
+                    <p style={{ margin: '5px 0', fontSize: '14px' }}>
+                        Typ: {sched.type === 'monthly' ? 'Miesięczny' : 'Tygodniowy'}
+                    </p>
+                </div>
+
+                <div style={{ marginTop: '20px', display: 'flex', gap: '10px' }}>
+                    <button
+                        onClick={() => navigate(`/schedule/edit/${objectId}/${sched.id}`)}
+                        style={{ flex: 1, padding: '8px', background: '#6c757d', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+                    >
+                        Podgląd
+                    </button>
+                    
+                    <button
+                        onClick={() => handleDelete(sched.id)}
+                        style={{ padding: '8px 12px', background: '#dc3545', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+                        title="Usuń trwale"
+                    >
+                        🗑️
+                    </button>
+                </div>
+              </div>
+            ))}
+          </div>
+      )}
+    </div>
   );
 };
 

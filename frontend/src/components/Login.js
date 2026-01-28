@@ -1,15 +1,19 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-const Login = ({ setToken }) => {
+const Login = ({ onLogin }) => { // Odbieramy onLogin zamiast setToken
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const navigate = useNavigate(); // Hook do nawigacji
+  const [error, setError] = useState('');
+  const navigate = useNavigate();
 
-  const handleLogin = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    setError('');
+
     try {
-      const response = await fetch('http://127.0.0.1:5000/login', {
+      // Upewnij się, że adres portu (5000) jest zgodny z Twoim backendem
+      const response = await fetch('http://127.0.0.1:5000/login', { 
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -18,68 +22,74 @@ const Login = ({ setToken }) => {
       });
 
       const data = await response.json();
-      
+
       if (response.ok) {
-        // 1. Backend zwraca teraz klucz 'token', a nie 'access_token'
-        const token = data.token;
-
-        // 2. Zapisz dane w LocalStorage
-        // Zapisujemy sam token (dla App.js przy odświeżeniu) oraz cały obiekt usera
-        localStorage.setItem("token", token);
-        localStorage.setItem("user", JSON.stringify(data)); 
-        
-        // 3. Zaktualizuj stan aplikacji (przekazany z App.js)
-        setToken(token);
-        
-        // 4. SPRAWDZENIE FLAGI ZMIANY HASŁA
-        if (data.must_change_password) {
-            // Jeśli flaga jest true -> przekieruj do zmiany hasła
-            navigate('/change-password');
-        } else {
-            // Jeśli false -> normalnie do Dashboardu
-            navigate('/'); 
+        // Logowanie udane
+        // Wywołujemy funkcję z App.js przekazując sam token string
+        if (onLogin) {
+            onLogin(data.token);
         }
-
+        navigate('/'); // Przekierowanie na stronę główną (App.js zdecyduje co pokazać)
       } else {
-        alert(data.message || 'Invalid email or password');
+        // Błąd logowania (np. 401)
+        setError(data.message || 'Błąd logowania');
       }
-    } catch (error) {
-      console.error('Error logging in:', error);
-      alert('An error occurred. Please try again.');
+    } catch (err) {
+      console.error(err);
+      setError('Błąd połączenia z serwerem');
     }
   };
 
   return (
-    <div style={{ maxWidth: '300px', margin: '50px auto', padding: '20px', border: '1px solid #ddd', borderRadius: '8px' }}>
-      <h2 style={{ textAlign: 'center' }}>Login</h2>
-      <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-        <div>
-          <label style={{ display: 'block', marginBottom: '5px' }}>Email:</label>
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            style={{ width: '100%', padding: '8px', boxSizing: 'border-box' }}
-          />
-        </div>
-        <div>
-          <label style={{ display: 'block', marginBottom: '5px' }}>Password:</label>
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            style={{ width: '100%', padding: '8px', boxSizing: 'border-box' }}
-          />
-        </div>
-        <button 
-            type="submit"
-            style={{ padding: '10px', backgroundColor: '#007bff', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
-        >
-            Login
-        </button>
-      </form>
+    <div style={{ 
+        display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', backgroundColor: '#f0f2f5' 
+    }}>
+      <div style={{ 
+          padding: '40px', background: 'white', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', width: '100%', maxWidth: '400px' 
+      }}>
+        <h2 style={{ textAlign: 'center', marginBottom: '20px', color: '#333' }}>Logowanie</h2>
+        
+        {error && (
+            <div style={{ 
+                backgroundColor: '#ffebe9', color: '#cc0033', padding: '10px', borderRadius: '4px', marginBottom: '15px', fontSize: '14px', textAlign: 'center' 
+            }}>
+                {error}
+            </div>
+        )}
+
+        <form onSubmit={handleSubmit}>
+          <div style={{ marginBottom: '15px' }}>
+            <label style={{ display: 'block', marginBottom: '5px', fontSize: '14px', fontWeight: 'bold' }}>Email</label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              style={{ width: '100%', padding: '10px', border: '1px solid #ccc', borderRadius: '4px', boxSizing: 'border-box' }}
+            />
+          </div>
+          
+          <div style={{ marginBottom: '20px' }}>
+            <label style={{ display: 'block', marginBottom: '5px', fontSize: '14px', fontWeight: 'bold' }}>Hasło</label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              style={{ width: '100%', padding: '10px', border: '1px solid #ccc', borderRadius: '4px', boxSizing: 'border-box' }}
+            />
+          </div>
+          
+          <button 
+            type="submit" 
+            style={{ 
+                width: '100%', padding: '12px', backgroundColor: '#007bff', color: 'white', border: 'none', borderRadius: '4px', fontSize: '16px', fontWeight: 'bold', cursor: 'pointer' 
+            }}
+          >
+            Zaloguj się
+          </button>
+        </form>
+      </div>
     </div>
   );
 };

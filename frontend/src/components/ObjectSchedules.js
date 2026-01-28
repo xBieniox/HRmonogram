@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { hasAccess } from '../authUtils';
 
 const ObjectSchedules = ({ token }) => {
   const { objectId } = useParams();
@@ -9,10 +10,16 @@ const ObjectSchedules = ({ token }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    
+    if (!hasAccess(token, ['admin', 'global_hr', 'local_hr'], objectId)) {
+        navigate('/');
+        return;
+    }
+
     fetchSchedules();
     fetchObjectName();
-    // eslint-disable-next-line
-  }, [objectId]);
+    
+  }, [objectId, token, navigate]);
 
   const fetchObjectName = async () => {
       try {
@@ -20,7 +27,8 @@ const ObjectSchedules = ({ token }) => {
              headers: { Authorization: `Bearer ${token}` }
           });
           if (res.ok) {
-              const data = await res.json();
+              
+              const data = await res.json(); 
               setObjectName(data.name);
           }
       } catch (e) { console.error(e); }
@@ -28,7 +36,7 @@ const ObjectSchedules = ({ token }) => {
 
   const fetchSchedules = async () => {
     try {
-      const response = await fetch(`http://127.0.0.1:5000/schedules/active/${objectId}`, {
+      const response = await fetch(`http://127.0.0.1:5000/schedules/active/${objectId}?view=active`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (response.ok) {
@@ -36,7 +44,7 @@ const ObjectSchedules = ({ token }) => {
         setSchedules(data);
       }
     } catch (error) {
-      console.error('Error fetching schedules:', error);
+      console.error(error);
     } finally {
         setLoading(false);
     }
@@ -67,6 +75,7 @@ const ObjectSchedules = ({ token }) => {
               headers: { Authorization: `Bearer ${token}` }
           });
           
+         
           const data = await res.json();
 
           if (res.ok) {
@@ -90,7 +99,6 @@ const ObjectSchedules = ({ token }) => {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '2px solid #eee', paddingBottom: '10px' }}>
         <h2 style={{ margin: 0 }}>Grafiki: <span style={{color: '#007bff'}}>{objectName}</span></h2>
         
-        {/* PRZYCISKI NAWIGACYJNE */}
         <div style={{ display: 'flex', gap: '10px' }}>
             <button 
                 onClick={() => navigate('/schedules')}
@@ -99,7 +107,13 @@ const ObjectSchedules = ({ token }) => {
                 &larr; Wróć
             </button>
             
-            {/* PRZYWRÓCONY PRZYCISK PREFERENCJI */}
+            <button 
+                onClick={() => navigate(`/schedules/history/${objectId}`)}
+                style={{ padding: '8px 15px', background: '#6610f2', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+            >
+                📜 Historia
+            </button>
+
             <button 
                 onClick={() => navigate(`/schedules/settings/${objectId}`)}
                 style={{ padding: '8px 15px', background: '#17a2b8', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
@@ -118,7 +132,7 @@ const ObjectSchedules = ({ token }) => {
 
       {schedules.length === 0 ? (
           <div style={{ textAlign: 'center', color: '#666', marginTop: '50px' }}>
-              Brak grafików dla tego obiektu. Skonfiguruj preferencje i utwórz pierwszy!
+              Brak aktywnych grafików. Sprawdź historię lub utwórz nowy.
           </div>
       ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '20px' }}>

@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { BrowserRouter as Router, Routes, Route, Link, Navigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route, Link, Navigate, useLocation } from 'react-router-dom';
 import CreateUser from './components/CreateUser';
 import ManageObjects from './components/ManageObjects';
 import Dashboard from './components/Dashboard';
@@ -8,122 +8,217 @@ import Employees from './components/Employees';
 import Schedules from './components/Schedules';
 import ObjectSchedules from './components/ObjectSchedules';
 import CreateSchedule from './components/CreateNewSchedule';
-import ChangePassword from './components/ChangePassword'; // Pamiętaj o imporcie!
+import ChangePassword from './components/ChangePassword'; 
 import SchedulePreferences from './components/SchedulePreferences';
+import ScheduleHistory from './components/ScheduleHistory';
+import EmployeeDashboard from './components/EmployeeDashboard';
+import { getUserRole } from './authUtils';
+
+// --- IMPORT LOGO ---
+import logo from './logo.png';
+
+// Komponent NavLink do ładniejszego stylowania aktywnych linków
+const NavLink = ({ to, children }) => {
+    const location = useLocation();
+    const isActive = location.pathname === to || location.pathname.startsWith(to + '/'); // Proste sprawdzenie aktywności
+    
+    return (
+        <Link 
+            to={to} 
+            style={{ 
+                textDecoration: 'none', 
+                color: isActive ? '#007bff' : '#555', 
+                fontWeight: isActive ? 'bold' : 'normal',
+                padding: '8px 12px',
+                borderRadius: '4px',
+                transition: 'background-color 0.2s, color 0.2s',
+                backgroundColor: isActive ? '#e7f1ff' : 'transparent'
+            }}
+            onMouseEnter={(e) => { if(!isActive) e.target.style.color = '#007bff'; }}
+            onMouseLeave={(e) => { if(!isActive) e.target.style.color = '#555'; }}
+        >
+            {children}
+        </Link>
+    );
+};
 
 const App = () => {
   const [token, setToken] = useState(localStorage.getItem('token'));
+  const [role, setRole] = useState(null);
 
-  // --- 1. FUNKCJA DEKODUJĄCA ROLĘ ---
-  const getRoleFromToken = (jwtToken) => {
-    try {
-      if (!jwtToken) return null;
-      const base64Url = jwtToken.split('.')[1];
-      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-      const jsonPayload = decodeURIComponent(window.atob(base64).split('').map(c => 
-          '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)
-      ).join(''));
-      return JSON.parse(jsonPayload).sub?.role;
-    } catch { return null; }
-  };
+  useEffect(() => {
+    if (token) {
+      setRole(getUserRole(token));
+    } else {
+      setRole(null);
+    }
+  }, [token]);
 
-  const role = getRoleFromToken(token);
   const isGlobalAdmin = role === 'admin' || role === 'global_hr';
+  const isEmployee = role === 'employee';
+  const isLocalHR = role === 'local_hr';
+
+  const handleLogin = (newToken) => {
+      setToken(newToken);
+      localStorage.setItem('token', newToken);
+      setRole(getUserRole(newToken));
+  };
 
   const handleLogout = () => {
     setToken(null);
+    setRole(null);
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     localStorage.removeItem('userRole');
   };
 
-  // --- GLÓWNA ZMIANA: <Router> OPLATA WSZYSTKO ---
   return (
     <Router>
-      <div style={{ fontFamily: 'Arial, sans-serif' }}>
+      <div style={{ fontFamily: '"Segoe UI", Tahoma, Geneva, Verdana, sans-serif', backgroundColor: '#f9f9f9', minHeight: '100vh' }}>
         
-        {/* WARUNEK LOGOWANIA W ŚRODKU ROUTERA */}
         {!token ? (
-          <Login setToken={(t) => { setToken(t); localStorage.setItem('token', t); }} />
+          <Login onLogin={handleLogin} />
         ) : (
           <>
-            {/* --- APLIKACJA DLA ZALOGOWANYCH --- */}
             <header
               style={{
-                padding: '10px',
-                backgroundColor: '#f0f0f0',
-                borderBottom: '1px solid #ddd',
+                padding: '0 30px',
+                backgroundColor: '#ffffff',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+                height: '64px',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                position: 'sticky',
+                top: 0,
+                zIndex: 1000
               }}
             >
-              <h1>HRmonogram Admin Panel</h1>
-              <nav style={{ marginTop: '10px' }}>
-                <Link to="/">Dashboard</Link> |{' '}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                  {/* --- LOGO APLIKACJI --- */}
+                  <img 
+                    src={logo} 
+                    alt="Logo" 
+                    style={{ 
+                        height: '75px', // Wysokość dopasowana do paska
+                        width: 'auto',
+                        objectFit: 'contain'
+                    }} 
+                  />
+                  
+                  <h1 style={{ margin: 0, fontSize: '20px', color: '#333', fontWeight: '600' }}>HRmonogram</h1>
+              </div>
+
+              <nav style={{ display: 'flex', gap: '5px', alignItems: 'center' }}>
+                
+                
+                <NavLink to="/">
+                    {isGlobalAdmin ? "Pulpit" : "Mój Grafik"}
+                </NavLink>
+                
                 
                 {isGlobalAdmin && (
                   <>
-                    <Link to="/create-user">Create User</Link> |{' '}
+                    <NavLink to="/create-user">Dodaj Użytkownika</NavLink>
+                    <NavLink to="/manage-objects">Obiekty</NavLink>
                   </>
                 )}
 
-                {/* Ukrywamy Employees dla zwykłego pracownika */}
-                {role !== 'employee' && (
+                
+                {!isEmployee && (
                   <>
-                    <Link to="/employees">Employees</Link> |{' '}
+                    <NavLink to="/employees">Pracownicy</NavLink>
+                    <NavLink to="/schedules">Grafiki</NavLink>
                   </>
                 )}
 
-                {isGlobalAdmin && (
-                  <>
-                    <Link to="/manage-objects">Manage Objects</Link> |{' '}
-                  </>
-                )}
+                <div style={{ width: '1px', height: '24px', background: '#ddd', margin: '0 10px' }}></div>
 
-                {/* Ukrywamy Schedules dla zwykłego pracownika */}
-                {role !== 'employee' && (
-                   <>
-                     <Link to="/schedules">Manage Work Schedules</Link> |{' '}
-                   </>
-                )}
+                
+                <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                    <Link to="/change-password" style={{ textDecoration: 'none', color: '#666', fontSize: '14px' }}>
+                        Zmień hasło
+                    </Link>
 
-                <button
-                  onClick={handleLogout}
-                  style={{
-                    border: 'none',
-                    backgroundColor: 'transparent',
-                    cursor: 'pointer',
-                    color: 'blue',
-                    textDecoration: 'underline',
-                  }}
-                >
-                  Logout
-                </button>
+                    <button
+                    onClick={handleLogout}
+                    style={{
+                        border: 'none',
+                        backgroundColor: '#dc3545',
+                        color: 'white',
+                        padding: '8px 16px',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        fontSize: '14px',
+                        fontWeight: '600',
+                        transition: 'background-color 0.2s'
+                    }}
+                    onMouseEnter={(e) => e.target.style.backgroundColor = '#c82333'}
+                    onMouseLeave={(e) => e.target.style.backgroundColor = '#dc3545'}
+                    >
+                    Wyloguj
+                    </button>
+                </div>
               </nav>
             </header>
 
-            <main style={{ padding: '20px' }}>
+            <main style={{ padding: '30px' }}>
               <Routes>
-                <Route path="/" element={<Dashboard />} />
+                {/* GŁÓWNA TRASA */}
+                <Route 
+                    path="/" 
+                    element={
+                        (isEmployee || isLocalHR) 
+                            ? <EmployeeDashboard token={token} /> 
+                            : <Dashboard token={token} />
+                    } 
+                />
                 
-                {/* Trasa do zmiany hasła */}
                 <Route path="/change-password" element={<ChangePassword token={token} />} />
 
+                {/* Trasy Admina */}
                 <Route 
                   path="/create-user" 
                   element={isGlobalAdmin ? <CreateUser token={token} /> : <Navigate to="/" />} 
                 />
-                
-                <Route path="/employees" element={<Employees token={token} />} />
-                
                 <Route 
                   path="/manage-objects" 
                   element={isGlobalAdmin ? <ManageObjects token={token} /> : <Navigate to="/" />} 
                 />
                 
-                <Route path="/schedules" element={<Schedules token={token} />} />
-                <Route path="/schedules/:objectId" element={<ObjectSchedules token={token} />} />
-                <Route path="/schedule/create/:objectId" element={<CreateSchedule token={token} />} />
-                <Route path="/schedule/edit/:objectId/:scheduleId" element={<CreateSchedule token={token} />} />
-                <Route path="/schedules/settings/:objectId" element={<SchedulePreferences token={token} />} />
+                {/* Trasy HR */}
+                <Route 
+                    path="/employees" 
+                    element={!isEmployee ? <Employees token={token} /> : <Navigate to="/" />} 
+                />
+                <Route 
+                    path="/schedules" 
+                    element={!isEmployee ? <Schedules token={token} /> : <Navigate to="/" />} 
+                />
+                <Route 
+                    path="/schedules/:objectId" 
+                    element={!isEmployee ? <ObjectSchedules token={token} /> : <Navigate to="/" />} 
+                />
+                <Route 
+                    path="/schedule/create/:objectId" 
+                    element={!isEmployee ? <CreateSchedule token={token} /> : <Navigate to="/" />} 
+                />
+                <Route 
+                    path="/schedule/edit/:objectId/:scheduleId" 
+                    element={!isEmployee ? <CreateSchedule token={token} /> : <Navigate to="/" />} 
+                />
+                <Route 
+                    path="/schedules/settings/:objectId" 
+                    element={!isEmployee ? <SchedulePreferences token={token} /> : <Navigate to="/" />} 
+                />
+                <Route 
+                    path="/schedules/history/:objectId" 
+                    element={!isEmployee ? <ScheduleHistory token={token} /> : <Navigate to="/" />} 
+                />
+
+                <Route path="/my-schedule" element={<EmployeeDashboard token={token} />} />
+
+                <Route path="*" element={<Navigate to="/" />} />
               </Routes>
             </main>
           </>

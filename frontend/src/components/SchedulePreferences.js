@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import { hasAccess } from '../authUtils';
 
 const SchedulePreferences = ({ token }) => {
   const { objectId } = useParams();
@@ -8,7 +9,6 @@ const SchedulePreferences = ({ token }) => {
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
 
-  // Stan preferencji
   const [preferences, setPreferences] = useState({
     work_days: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
     schedule_type: 'monthly',
@@ -17,18 +17,20 @@ const SchedulePreferences = ({ token }) => {
     holidays_included: false,
   });
   
-  // Stan szablonów
   const [templates, setTemplates] = useState([]);
-  
-  // Stan formularza nowego szablonu
   const [newTemplate, setNewTemplate] = useState({ abbreviation: '', start_time: '', end_time: '' });
 
   useEffect(() => {
+    if (!hasAccess(token, ['admin', 'global_hr', 'local_hr'], objectId)) {
+        navigate('/');
+        return;
+    }
+
     if (objectId && token) {
         fetchData();
     }
     // eslint-disable-next-line
-  }, [objectId, token]);
+  }, [objectId, token, navigate]);
 
   const fetchData = async () => {
       try {
@@ -46,7 +48,6 @@ const SchedulePreferences = ({ token }) => {
               holidays_included: data.preference.holidays_included || false
           });
 
-          // Upewniamy się, że szablony to tablica
           if (Array.isArray(data.templates)) {
               setTemplates(data.templates);
           } else {
@@ -54,7 +55,7 @@ const SchedulePreferences = ({ token }) => {
           }
           
       } catch (error) {
-          console.error("Błąd pobierania ustawień:", error);
+          console.error(error);
       } finally {
           setLoading(false);
       }
@@ -130,7 +131,6 @@ const SchedulePreferences = ({ token }) => {
       
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '30px' }}>
         
-        {/* LEWA KOLUMNA - USTAWIENIA OGÓLNE */}
         <div>
             <div style={{ marginBottom: '15px' }}>
                 <label style={{ fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>Typ Grafiku:</label>
@@ -168,7 +168,6 @@ const SchedulePreferences = ({ token }) => {
                 />
             </div>
 
-            {/* --- NOWE POLE: ŚWIĘTA --- */}
             <div style={{ marginBottom: '15px', background: '#f8f9fa', padding: '10px', borderRadius: '4px' }}>
                 <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', fontWeight: 'bold' }}>
                     <input 
@@ -201,7 +200,6 @@ const SchedulePreferences = ({ token }) => {
             </div>
         </div>
 
-        {/* PRAWA KOLUMNA - SZABLONY */}
         <div>
             <div style={{ marginBottom: '20px', border: '1px solid #ddd', padding: '15px', borderRadius: '8px', background: '#f9f9f9' }}>
                 <h4 style={{ marginTop: 0 }}>Definicje Zmian (Szablony)</h4>

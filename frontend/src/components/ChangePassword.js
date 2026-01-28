@@ -14,9 +14,9 @@ const ChangePassword = ({ token }) => {
       return;
     }
 
-  // ...
+ 
   try {
-    // ZMIANA ADRESU URL (teraz korzystamy z endpointu w auth.py)
+    
     const response = await fetch('http://127.0.0.1:5000/first-password-change', {
       method: 'POST',
       headers: {
@@ -25,13 +25,13 @@ const ChangePassword = ({ token }) => {
       },
       body: JSON.stringify({ new_password: newPassword })
     });
-// ...
+
 
       const data = await response.json();
 
       if (response.ok) {
         alert("Hasło zostało zmienione pomyślnie. Możesz teraz korzystać z systemu.");
-        navigate('/'); // Przekieruj do Dashboardu
+        navigate('/'); 
       } else {
         alert("Błąd: " + data.message);
       }

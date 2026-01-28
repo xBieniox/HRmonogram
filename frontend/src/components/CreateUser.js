@@ -1,51 +1,29 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { hasAccess } from '../authUtils';
 
 const CreateUser = ({ token }) => {
   const navigate = useNavigate();
   
-  // Stany formularza
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [role, setRole] = useState('employee');
   const [contractType, setContractType] = useState('');
   
-  // Stany dla Obiektów i Departamentów
   const [objectId, setObjectId] = useState('');
   const [departmentId, setDepartmentId] = useState('');
   
-  // Listy do wyboru
   const [objects, setObjects] = useState([]);
   const [departments, setDepartments] = useState([]);
 
-  // --- 1. SPRAWDZANIE UPRAWNIEŃ I POBIERANIE OBIEKTÓW ---
   useEffect(() => {
-    const userRole = getRoleFromToken(token);
-
-    // Jeśli to nie Admin i nie Global HR -> Wyrzuć do listy pracowników
-    if (userRole !== 'admin' && userRole !== 'global_hr') {
-        alert("Brak uprawnień do tworzenia użytkowników.");
+    if (!hasAccess(token, ['admin', 'global_hr'])) {
         navigate('/employees');
     } else {
-        // Jeśli ma uprawnienia, pobierz listę obiektów do selecta
         fetchObjects();
     }
-    // eslint-disable-next-line
-  }, [token]);
-
-  // Funkcja dekodująca token (pomocnicza)
-  const getRoleFromToken = (jwtToken) => {
-    try {
-        if (!jwtToken) return null;
-        const base64Url = jwtToken.split('.')[1];
-        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-        const jsonPayload = decodeURIComponent(window.atob(base64).split('').map(c => 
-            '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)
-        ).join(''));
-        return JSON.parse(jsonPayload).sub?.role;
-    } catch { return null; }
-  };
+  }, [token, navigate]);
 
   const fetchObjects = async () => {
     try {
@@ -59,11 +37,10 @@ const CreateUser = ({ token }) => {
     } catch (err) { console.error(err); }
   };
 
-  // Pobieranie departamentów po wybraniu obiektu
   const handleObjectChange = async (e) => {
       const selectedObjId = e.target.value;
       setObjectId(selectedObjId);
-      setDepartmentId(''); // Reset departamentu przy zmianie obiektu
+      setDepartmentId(''); 
       setDepartments([]);
 
       if (selectedObjId) {
@@ -91,7 +68,6 @@ const CreateUser = ({ token }) => {
   const handleCreateUser = async (e) => {
     e.preventDefault();
     try {
-      // Przygotowanie danych (wysyłamy null, jeśli puste stringi)
       const payload = {
           email,
           password,
@@ -114,117 +90,131 @@ const CreateUser = ({ token }) => {
       const data = await response.json();
       if (response.ok) {
         alert(`User created successfully! Temporary password: ${data.password}`);
-        // Reset formularza
-        setEmail('');
-        setPassword('');
-        setName('');
-        setRole('employee');
-        setContractType('');
-        setObjectId('');
-        setDepartmentId('');
-        navigate('/employees'); // Przekierowanie po sukcesie
+        navigate('/employees'); 
       } else {
         alert(data.message || 'Failed to create user');
       }
     } catch (error) {
-      console.error('Error creating user:', error);
+      console.error(error);
       alert('An error occurred. Please try again.');
     }
   };
 
+  const inputStyle = {
+      width: '100%', padding: '10px', border: '1px solid #ccc', borderRadius: '4px', boxSizing: 'border-box'
+  };
+
+  const labelStyle = {
+      display: 'block', marginBottom: '5px', fontWeight: 'bold', fontSize: '13px', color: '#333'
+  };
+
   return (
-    <div style={{ maxWidth: '500px', margin: '20px auto', padding: '20px', border: '1px solid #ddd', borderRadius: '8px' }}>
-      <h2 style={{ textAlign: 'center' }}>Create User</h2>
-      <form onSubmit={handleCreateUser} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-        
-        {/* Imię i Nazwisko */}
-        <div>
-          <label style={{ display: 'block', marginBottom: '5px' }}>Name:</label>
-          <input 
-            type="text" value={name} onChange={(e) => setName(e.target.value)} required 
-            style={{ width: '100%', padding: '8px' }}
-          />
-        </div>
+    <div style={{ padding: '40px 20px', backgroundColor: '#f4f6f8', minHeight: 'calc(100vh - 60px)' }}>
+        <div style={{ maxWidth: '800px', margin: '0 auto', background: 'white', padding: '30px', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
+            
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px', borderBottom: '1px solid #eee', paddingBottom: '15px' }}>
+                <h2 style={{ margin: 0, fontSize: '24px', color: '#333' }}>Utwórz Nowego Użytkownika</h2>
+                <button 
+                    onClick={() => navigate('/employees')}
+                    style={{ background: '#6c757d', color: 'white', border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer' }}
+                >
+                    Anuluj
+                </button>
+            </div>
 
-        {/* Email */}
-        <div>
-          <label style={{ display: 'block', marginBottom: '5px' }}>Email:</label>
-          <input 
-            type="email" value={email} onChange={(e) => setEmail(e.target.value)} required 
-            style={{ width: '100%', padding: '8px' }}
-          />
-        </div>
+            <form onSubmit={handleCreateUser}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
+                    
+                    <div>
+                        <label style={labelStyle}>Imię i Nazwisko</label>
+                        <input 
+                            type="text" value={name} onChange={(e) => setName(e.target.value)} required 
+                            style={inputStyle} placeholder="np. Jan Kowalski"
+                        />
+                    </div>
 
-        {/* Hasło */}
-        <div>
-          <label style={{ display: 'block', marginBottom: '5px' }}>Password:</label>
-          <div style={{ display: 'flex', gap: '10px' }}>
-            <input 
-                type="text" value={password} onChange={(e) => setPassword(e.target.value)} required 
-                style={{ flex: 1, padding: '8px' }}
-            />
-            <button type="button" onClick={handleGeneratePassword} style={{ padding: '8px' }}>
-              Generate
-            </button>
-          </div>
-        </div>
+                    <div>
+                        <label style={labelStyle}>Adres Email</label>
+                        <input 
+                            type="email" value={email} onChange={(e) => setEmail(e.target.value)} required 
+                            style={inputStyle} placeholder="jan.kowalski@firma.pl"
+                        />
+                    </div>
 
-        {/* Rola */}
-        <div>
-          <label style={{ display: 'block', marginBottom: '5px' }}>Role:</label>
-          <select value={role} onChange={(e) => setRole(e.target.value)} style={{ width: '100%', padding: '8px' }}>
-            <option value="employee">Employee</option>
-            <option value="local_hr">Local HR</option>
-            <option value="global_hr">Global HR</option>
-            <option value="admin">Admin</option>
-          </select>
-        </div>
+                    <div style={{ gridColumn: '1 / -1' }}>
+                        <label style={labelStyle}>Hasło</label>
+                        <div style={{ display: 'flex', gap: '10px' }}>
+                            <input 
+                                type="text" value={password} onChange={(e) => setPassword(e.target.value)} required 
+                                style={{ ...inputStyle, fontFamily: 'monospace' }}
+                                placeholder="Wpisz lub wygeneruj..."
+                            />
+                            <button 
+                                type="button" onClick={handleGeneratePassword} 
+                                style={{ padding: '0 20px', background: '#17a2b8', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
+                            >
+                                Generuj
+                            </button>
+                        </div>
+                    </div>
 
-        {/* Typ Umowy */}
-        <div>
-          <label style={{ display: 'block', marginBottom: '5px' }}>Contract Type:</label>
-          <select value={contractType} onChange={(e) => setContractType(e.target.value)} style={{ width: '100%', padding: '8px' }}>
-            <option value="">Select Contract...</option>
-            <option value="Umowa o Pracę">Umowa o Pracę</option>
-            <option value="Umowa Zlecenie">Umowa Zlecenie</option>
-            <option value="Umowa B2B">Umowa B2B</option>
-          </select>
-        </div>
+                    <div>
+                        <label style={labelStyle}>Rola w systemie</label>
+                        <select value={role} onChange={(e) => setRole(e.target.value)} style={inputStyle}>
+                            <option value="employee">Pracownik (Employee)</option>
+                            <option value="local_hr">Local HR</option>
+                            <option value="global_hr">Global HR</option>
+                            <option value="admin">Administrator</option>
+                        </select>
+                    </div>
 
-        {/* Wybór Obiektu */}
-        <div>
-          <label style={{ display: 'block', marginBottom: '5px' }}>Object:</label>
-          <select value={objectId} onChange={handleObjectChange} style={{ width: '100%', padding: '8px' }}>
-            <option value="">Select Object...</option>
-            {objects.map(obj => (
-                <option key={obj.id} value={obj.id}>{obj.name}</option>
-            ))}
-          </select>
-        </div>
+                    <div>
+                        <label style={labelStyle}>Typ Umowy</label>
+                        <select value={contractType} onChange={(e) => setContractType(e.target.value)} style={inputStyle}>
+                            <option value="">-- Wybierz --</option>
+                            <option value="Umowa o Pracę">Umowa o Pracę</option>
+                            <option value="Umowa Zlecenie">Umowa Zlecenie</option>
+                            <option value="Umowa B2B">Umowa B2B</option>
+                        </select>
+                    </div>
 
-        {/* Wybór Departamentu (aktywny tylko po wybraniu obiektu) */}
-        <div>
-          <label style={{ display: 'block', marginBottom: '5px' }}>Department:</label>
-          <select 
-            value={departmentId} 
-            onChange={(e) => setDepartmentId(e.target.value)} 
-            disabled={!objectId}
-            style={{ width: '100%', padding: '8px', backgroundColor: !objectId ? '#f0f0f0' : 'white' }}
-          >
-            <option value="">Select Department...</option>
-            {departments.map(dep => (
-                <option key={dep.id} value={dep.id}>{dep.name}</option>
-            ))}
-          </select>
-        </div>
+                    <div>
+                        <label style={labelStyle}>Przypisz do Obiektu</label>
+                        <select value={objectId} onChange={handleObjectChange} style={inputStyle}>
+                            <option value="">-- Brak / Nie dotyczy --</option>
+                            {objects.map(obj => (
+                                <option key={obj.id} value={obj.id}>{obj.name}</option>
+                            ))}
+                        </select>
+                    </div>
 
-        <button 
-            type="submit" 
-            style={{ padding: '10px', backgroundColor: '#007bff', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', marginTop: '10px' }}
-        >
-            Create User
-        </button>
-      </form>
+                    <div>
+                        <label style={labelStyle}>Przypisz do Departamentu</label>
+                        <select 
+                            value={departmentId} 
+                            onChange={(e) => setDepartmentId(e.target.value)} 
+                            disabled={!objectId}
+                            style={{ ...inputStyle, backgroundColor: !objectId ? '#e9ecef' : 'white' }}
+                        >
+                            <option value="">-- Wybierz --</option>
+                            {departments.map(dep => (
+                                <option key={dep.id} value={dep.id}>{dep.name}</option>
+                            ))}
+                        </select>
+                    </div>
+
+                </div>
+
+                <div style={{ textAlign: 'right', marginTop: '30px', paddingTop: '20px', borderTop: '1px solid #eee' }}>
+                    <button 
+                        type="submit" 
+                        style={{ padding: '12px 30px', backgroundColor: '#28a745', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '16px', fontWeight: 'bold' }}
+                    >
+                        Utwórz Użytkownika
+                    </button>
+                </div>
+            </form>
+        </div>
     </div>
   );
 };

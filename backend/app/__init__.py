@@ -20,13 +20,11 @@ bcrypt = Bcrypt(app)
 jwt = JWTManager(app)
 
 # Rejestracja blueprintów (routów)
-from app.routes import auth, users, objects, contracts, schedules, preferences, shifts, createschedules, schedule_history
+from app.routes import auth, users, objects, contracts, schedules, shifts, stats
 app.register_blueprint(auth.bp)
 app.register_blueprint(users.bp)
 app.register_blueprint(objects.bp)
 app.register_blueprint(contracts.bp)
 app.register_blueprint(schedules.bp)
-app.register_blueprint(preferences.bp)
 app.register_blueprint(shifts.bp)
-app.register_blueprint(createschedules.bp)
-app.register_blueprint(schedule_history.bp)
+app.register_blueprint(stats.bp)

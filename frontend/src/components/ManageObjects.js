@@ -1,44 +1,28 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { hasAccess } from '../authUtils';
 
 const ManageObjects = ({ token }) => {
   const navigate = useNavigate();
   
-  // --- STANY ---
   const [objects, setObjects] = useState([]);
   const [departments, setDepartments] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [selectedObject, setSelectedObject] = useState(null);
-  const [selectedDeptName, setSelectedDeptName] = useState(null); // Do wyświetlania nagłówka listy pracowników
+  const [selectedDeptName, setSelectedDeptName] = useState(null);
 
-  // Formularze
   const [objectName, setObjectName] = useState('');
   const [objectLocation, setObjectLocation] = useState('');
   const [departmentName, setDepartmentName] = useState('');
 
-  // --- 1. BEZPIECZEŃSTWO ---
   useEffect(() => {
-    const role = getRoleFromToken(token);
-    if (role !== 'admin' && role !== 'global_hr') {
-        navigate('/'); // Wyrzuć nieuprawnionych
-    } else {
-        fetchObjects();
+    if (!hasAccess(token, ['admin', 'global_hr'])) {
+        navigate('/');
+        return;
     }
+    fetchObjects();
     // eslint-disable-next-line
-  }, [token]);
-
-  const getRoleFromToken = (jwtToken) => {
-    try {
-      const base64Url = jwtToken.split('.')[1];
-      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-      const jsonPayload = decodeURIComponent(window.atob(base64).split('').map(c => 
-          '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)
-      ).join(''));
-      return JSON.parse(jsonPayload).sub?.role;
-    } catch { return null; }
-  };
-
-  // --- API CALLS ---
+  }, [token, navigate]);
 
   const fetchObjects = async () => {
     try {
@@ -65,7 +49,7 @@ const ManageObjects = ({ token }) => {
       });
       if(response.ok) {
           setEmployees(await response.json());
-          setSelectedDeptName(null); // Reset filtra
+          setSelectedDeptName(null);
       }
     } catch (error) { console.error(error); }
   };
@@ -81,8 +65,6 @@ const ManageObjects = ({ token }) => {
       }
     } catch (error) { console.error(error); }
   };
-
-  // --- AKCJE (TWORZENIE / USUWANIE) ---
 
   const handleCreateObject = async (e) => {
     e.preventDefault();
@@ -125,14 +107,13 @@ const ManageObjects = ({ token }) => {
         fetchDepartments(selectedObject.id);
         setDepartmentName('');
       } else {
-        // TU WYŚWIETLAMY BŁĄD O DUPLIKACIE
         alert(data.message || "Błąd tworzenia departamentu");
       }
     } catch (error) { console.error(error); }
   };
 
   const handleDeleteObject = async (id, e) => {
-    e.stopPropagation(); // Żeby nie otwierać obiektu przy kliknięciu usuń
+    e.stopPropagation(); 
     if(!window.confirm("Czy na pewno usunąć ten obiekt?")) return;
 
     try {
@@ -155,19 +136,15 @@ const ManageObjects = ({ token }) => {
     } catch (error) { console.error(error); }
   };
 
-  // --- WIDOKI ---
-
   return (
     <div style={{ padding: '20px', maxWidth: '1200px', margin: '0 auto' }}>
       
-      {/* 1. WIDOK LISTY OBIEKTÓW */}
       {!selectedObject ? (
         <>
           <h2 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '20px', borderBottom: '2px solid #eee', paddingBottom: '10px' }}>
             Zarządzanie Obiektami
           </h2>
           
-          {/* Formularz dodawania */}
           <div style={{ background: '#fff', padding: '20px', borderRadius: '8px', boxShadow: '0 2px 5px rgba(0,0,0,0.1)', marginBottom: '30px' }}>
             <h3 style={{ marginTop: 0, marginBottom: '15px' }}>Dodaj Nowy Obiekt</h3>
             <form onSubmit={handleCreateObject} style={{ display: 'flex', gap: '15px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
@@ -196,7 +173,6 @@ const ManageObjects = ({ token }) => {
             </form>
           </div>
 
-          {/* Lista kafelków */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '20px' }}>
             {objects.map((obj) => (
               <div 
@@ -233,7 +209,6 @@ const ManageObjects = ({ token }) => {
           </div>
         </>
       ) : (
-        /* 2. WIDOK SZCZEGÓŁÓW OBIEKTU */
         <>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', borderBottom: '2px solid #eee', paddingBottom: '10px' }}>
             <h2 style={{ fontSize: '24px', margin: 0 }}>
@@ -248,8 +223,7 @@ const ManageObjects = ({ token }) => {
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '20px' }}>
-             
-             {/* LEWA KOLUMNA: DEPARTAMENTY */}
+              
              <div style={{ background: '#fff', padding: '20px', borderRadius: '8px', boxShadow: '0 2px 5px rgba(0,0,0,0.1)', height: 'fit-content' }}>
                 <h3 style={{ marginTop: 0 }}>Departamenty</h3>
                 
@@ -302,7 +276,6 @@ const ManageObjects = ({ token }) => {
                 </ul>
              </div>
 
-             {/* PRAWA KOLUMNA: PRACOWNICY */}
              <div style={{ background: '#fff', padding: '20px', borderRadius: '8px', boxShadow: '0 2px 5px rgba(0,0,0,0.1)' }}>
                 <h3 style={{ marginTop: 0 }}>
                     Pracownicy {selectedDeptName ? `(Dział: ${selectedDeptName})` : '(Cały obiekt)'}

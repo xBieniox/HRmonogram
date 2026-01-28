@@ -12,13 +12,15 @@ def login():
     user = User.query.filter_by(email=data.get('email')).first()
 
     if user and bcrypt.check_password_hash(user.password_hash, data.get('password')):
-        # Generujemy token
         access_token = create_access_token(
-            identity={'id': user.id, 'role': user.role},
+            identity={
+                'id': user.id,
+                'role': user.role,
+                'object_id': user.object_id
+            },
             expires_delta=timedelta(hours=1)
         )
         
-        # POPRAWKA: Zwracamy 'token' (tak jak oczekuje frontend), a nie 'access_token'
         return jsonify({
             'token': access_token,
             'role': user.role,
@@ -27,13 +29,10 @@ def login():
 
     return jsonify(message='Invalid email or password'), 401
 
-# --- Endpoint do STANDARDOWEJ zmiany hasła (np. z profilu) ---
-# Wymaga podania starego hasła
 @bp.route('/change-password', methods=['POST'])
 @jwt_required()
 def change_password():
     current_identity = get_jwt_identity()
-    # Obsługa identity jako słownika lub ID
     user_id = current_identity.get('id') if isinstance(current_identity, dict) else current_identity
     
     data = request.json
@@ -48,8 +47,6 @@ def change_password():
 
     return jsonify(message='Password changed successfully'), 200
 
-# --- NOWY ENDPOINT DO PIERWSZEJ ZMIANY HASŁA ---
-# Nie wymaga starego hasła (bo wymuszamy zmianę po zalogowaniu)
 @bp.route('/first-password-change', methods=['POST'])
 @jwt_required()
 def first_password_change():
@@ -66,7 +63,6 @@ def first_password_change():
     if not new_pass or len(new_pass) < 6:
         return jsonify(message="Hasło musi mieć minimum 6 znaków"), 400
 
-    # Ustawiamy nowe hasło i zdejmujemy flagę
     user.password_hash = bcrypt.generate_password_hash(new_pass).decode('utf-8')
     user.must_change_password = False 
     db.session.commit()
