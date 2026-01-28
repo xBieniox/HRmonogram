@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-const Login = ({ onLogin }) => { // Odbieramy onLogin zamiast setToken
+const Login = ({ onLogin }) => { 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -12,7 +12,7 @@ const Login = ({ onLogin }) => { // Odbieramy onLogin zamiast setToken
     setError('');
 
     try {
-      // Upewnij się, że adres portu (5000) jest zgodny z Twoim backendem
+      
       const response = await fetch('http://127.0.0.1:5000/login', { 
         method: 'POST',
         headers: {
@@ -24,14 +24,13 @@ const Login = ({ onLogin }) => { // Odbieramy onLogin zamiast setToken
       const data = await response.json();
 
       if (response.ok) {
-        // Logowanie udane
-        // Wywołujemy funkcję z App.js przekazując sam token string
+        
         if (onLogin) {
             onLogin(data.token);
         }
-        navigate('/'); // Przekierowanie na stronę główną (App.js zdecyduje co pokazać)
+        navigate('/'); 
       } else {
-        // Błąd logowania (np. 401)
+       
         setError(data.message || 'Błąd logowania');
       }
     } catch (err) {

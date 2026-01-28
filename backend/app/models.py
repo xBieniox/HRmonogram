@@ -30,7 +30,7 @@ class Object(db.Model):
 class Department(db.Model):
     __tablename__ = 'departments'
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(120), nullable=False) # Usunięto unique=True (poprawka z wcześniejszego kroku)
+    name = db.Column(db.String(120), nullable=False) 
     object_id = db.Column(db.Integer, db.ForeignKey('objects.id'), nullable=False)
     object = db.relationship('Object', backref=db.backref('departments', lazy=True))
 
@@ -65,14 +65,14 @@ class ShiftTemplate(db.Model):
     end_time = db.Column(db.String(5), nullable=False)
     object = db.relationship('Object', backref=db.backref('shift_templates', lazy=True))
 
-# --- MODEL POJEDYNCZYCH ZMIAN ---
+
 class Schedule(db.Model):
     __tablename__ = 'schedules'
     id = db.Column(db.Integer, primary_key=True)
     employee_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     object_id = db.Column(db.Integer, db.ForeignKey('objects.id'), nullable=True)
     
-    # Powiązanie z nagłówkiem grafiku
+  
     work_schedule_id = db.Column(db.Integer, db.ForeignKey('work_schedules.id'), nullable=True)
 
     date = db.Column(db.Date, nullable=False)
@@ -82,7 +82,7 @@ class Schedule(db.Model):
     object = db.relationship('Object', backref=db.backref('daily_shifts', lazy=True))
 
 
-# --- DOKUMENT GRAFIKU (NAGŁÓWEK) ---
+
 class WorkSchedule(db.Model):
     __tablename__ = 'work_schedules'
     id = db.Column(db.Integer, primary_key=True)
@@ -95,15 +95,15 @@ class WorkSchedule(db.Model):
     created_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
     created_at = db.Column(db.DateTime, default=db.func.current_timestamp())
 
-    # === NOWA KOLUMNA: STATUS PUBLIKACJI ===
+ 
     is_published = db.Column(db.Boolean, default=False, nullable=False)
-    # =======================================
+   
 
-    # Relacje
+  
     object = db.relationship('Object', backref='saved_plans')
     shift_preference = db.relationship('ShiftPreference', backref='schedules', lazy='joined')
     
-    # Kaskadowe usuwanie: jak usuniesz grafik, znikną też zmiany w nim
+ 
     shifts = db.relationship('Schedule', backref='parent_schedule', lazy=True, cascade="all, delete-orphan")
     snapshot_preferences = db.Column(db.Text, nullable=True) 
     snapshot_templates = db.Column(db.Text, nullable=True)

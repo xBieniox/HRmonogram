@@ -12,8 +12,8 @@ def calculate_end_date(ws):
     Pomocnicza funkcja do obliczenia daty końca grafiku
     na podstawie jego typu (miesięczny/tygodniowy).
     """
-    # Próbujemy pobrać preferencje ze snapshota lub relacji
-    sched_type = 'monthly' # Domyślnie
+   
+    sched_type = 'monthly' 
     prefs = ws.get_preferences()
     
     if prefs and 'schedule_type' in prefs:
@@ -24,10 +24,10 @@ def calculate_end_date(ws):
     start = ws.start_date
     
     if sched_type == 'weekly':
-        # Tygodniowy: start + 6 dni
+        # start + 6 dni
         return start + timedelta(days=6)
     else:
-        # Miesięczny: ostatni dzień miesiąca daty startu
+      
         last_day = calendar.monthrange(start.year, start.month)[1]
         return start.replace(day=last_day)
 
@@ -35,11 +35,11 @@ def calculate_end_date(ws):
 @jwt_required()
 def get_dashboard_stats():
     try:
-        # 1. Podstawowe liczniki
+       
         total_employees = User.query.filter(User.role.in_(['employee', 'local_hr'])).count()
         total_objects = Object.query.count()
         
-        # 2. Statusy obiektów
+      
         today = datetime.now().date()
         
         objects = Object.query.all()
@@ -49,7 +49,7 @@ def get_dashboard_stats():
         missing_schedules_count = 0
 
         for obj in objects:
-            # Pobieramy najnowszy OPUBLIKOWANY grafik dla danego obiektu
+            
             latest_sched = WorkSchedule.query.filter_by(object_id=obj.id, is_published=True)\
                 .order_by(desc(WorkSchedule.start_date)).first()
             
@@ -57,22 +57,21 @@ def get_dashboard_stats():
             last_schedule_info = "Brak"
             
             if latest_sched:
-                # Obliczamy datę końcową tego grafiku
+                
                 end_date = calculate_end_date(latest_sched)
                 
-                # Formatowanie daty do wyświetlenia
+             
                 last_schedule_info = f"{latest_sched.start_date.strftime('%Y-%m-%d')} - {end_date.strftime('%Y-%m-%d')}"
 
-                # SPRAWDZENIE: Czy dzisiaj mieści się w zakresie tego grafiku?
+             
                 if latest_sched.start_date <= today <= end_date:
                     status = "ok"
                     active_schedules_count += 1
                 elif latest_sched.start_date > today:
-                    status = "future" # Mamy grafik, ale dopiero się zacznie (jest OK, ale nie aktywny dziś)
-                    # Opcjonalnie: możemy to traktować jako OK lub doliczać do braków bieżących
-                    # Tutaj uznajemy, że "brak bieżącego", ale informujemy
+                    status = "future" 
+                   
                 else:
-                    status = "outdated" # Data końca minęła
+                    status = "outdated" 
                     missing_schedules_count += 1
             else:
                 missing_schedules_count += 1

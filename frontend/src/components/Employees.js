@@ -109,7 +109,7 @@ const Employees = ({ token }) => {
 
   if (!authChecked) return null;
 
-  // --- STYLE ---
+  
   const containerStyle = {
       maxWidth: '1200px', margin: '0 auto', padding: '0'
   };
@@ -281,7 +281,7 @@ const Employees = ({ token }) => {
               </div>
           </div>
 
-          {/* PAGINACJA */}
+         
           <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '20px', marginTop: '10px' }}>
             <button
               onClick={() => handlePageChange(filters.page - 1)}

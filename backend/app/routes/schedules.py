@@ -28,10 +28,10 @@ def calculate_schedule_dates(ws):
     return start, end, sched_type
 
 def get_schedule_templates(ws):
-    # 1. Próbujemy pobrać ze snapshota (grafik historyczny/zatwierdzony)
+   
     templates = ws.get_templates()
     
-    # 2. Jeśli brak (stary grafik), pobieramy aktualne z bazy
+    
     if not templates:
         db_templates = ShiftTemplate.query.filter_by(object_id=ws.object_id).all()
         templates = [{
@@ -471,7 +471,7 @@ def delete_work_schedule(schedule_id):
         db.session.rollback()
         return jsonify(message=f"Błąd serwera: {str(e)}"), 500
 
-# --- DLA PRACOWNIKA: Pobieranie listy dostępnych grafików (Historia / Nadchodzące) ---
+
 @bp.route('/schedules/my-list', methods=['GET'])
 @jwt_required()
 def get_my_schedules_list():
@@ -508,7 +508,7 @@ def get_my_schedules_list():
 
     return jsonify(response_data)
 
-# --- DLA PRACOWNIKA: Pobieranie konkretnego grafiku (z walidacją dostępu) ---
+
 @bp.route('/schedules/employee-view/<int:schedule_id>', methods=['GET'])
 @jwt_required()
 def get_employee_schedule_details(schedule_id):
@@ -518,7 +518,7 @@ def get_employee_schedule_details(schedule_id):
 
     ws = WorkSchedule.query.get_or_404(schedule_id)
 
-    # Zabezpieczenie: Pracownik widzi tylko SWÓJ obiekt i tylko OPUBLIKOWANE
+   
     if ws.object_id != user.object_id or not ws.is_published:
         return jsonify(message="Brak dostępu do tego grafiku."), 403
 
@@ -532,7 +532,7 @@ def get_employee_schedule_details(schedule_id):
     employees = User.query.filter_by(object_id=user.object_id).all()
     employees_list = [{"id": e.id, "name": e.name} for e in employees]
     
-    # Pobieramy legendę (szablony)
+    
     templates = get_schedule_templates(ws)
 
     return jsonify({
@@ -542,11 +542,11 @@ def get_employee_schedule_details(schedule_id):
         "end_date": t_end.strftime('%Y-%m-%d'),
         "shifts": shifts_map,
         "employees": employees_list,
-        "templates": templates, # Legenda
+        "templates": templates, 
         "user_id": user.id
     })
 
-# --- DLA PRACOWNIKA: Pobieranie aktualnego (domyślnego) ---
+
 @bp.route('/schedules/my-current', methods=['GET'])
 @jwt_required()
 def get_my_current_schedule():
@@ -584,7 +584,7 @@ def get_my_current_schedule():
     employees = User.query.filter_by(object_id=user.object_id).all()
     employees_list = [{"id": e.id, "name": e.name} for e in employees]
     
-    # Dodajemy legendę
+  
     templates = get_schedule_templates(active_schedule)
 
     return jsonify({

@@ -17,7 +17,7 @@ const Dashboard = ({ token }) => {
       });
       if (response.ok) {
         const data = await response.json();
-        console.log("Stats data:", data); // Debug w konsoli
+        console.log("Stats data:", data); 
         setStats(data);
       }
     } catch (error) {
@@ -30,7 +30,7 @@ const Dashboard = ({ token }) => {
   if (loading) return <div style={{ padding: '40px', textAlign: 'center', color: '#666' }}>Ładowanie pulpitu...</div>;
   if (!stats) return <div style={{ padding: '40px', textAlign: 'center' }}>Błąd pobierania danych.</div>;
 
-  // --- KOMPONENTY UI ---
+
   const Card = ({ title, value, icon, color }) => (
     <div style={{ 
         background: 'white', padding: '25px', borderRadius: '12px', 
@@ -50,7 +50,6 @@ const Dashboard = ({ token }) => {
       let color = '#333';
       let text = 'Nieznany';
 
-      // Normalizacja statusu (małe litery)
       const s = status ? status.toLowerCase() : '';
 
       if (s === 'ok' || s === 'active') {
@@ -62,7 +61,7 @@ const Dashboard = ({ token }) => {
       } else if (s === 'missing') {
           bg = '#f8d7da'; color = '#721c24'; text = 'Brak grafiku';
       } else {
-          // Jeśli status jest inny, pokażmy go surowego dla debugowania
+         
           text = status;
       }
 
@@ -77,7 +76,7 @@ const Dashboard = ({ token }) => {
     <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
       <h2 style={{ marginBottom: '30px', color: '#333' }}>Pulpit Zarządzania</h2>
 
-      {/* 1. KAFELKI KPI */}
+      
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '20px', marginBottom: '40px' }}>
           <Card title="Pracownicy" value={stats.employees_count} icon="👥" color="#007bff" />
           <Card title="Obiekty" value={stats.objects_count} icon="🏢" color="#6610f2" />
@@ -87,7 +86,7 @@ const Dashboard = ({ token }) => {
 
       <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '30px' }}>
           
-          {/* 2. LISTA OBIEKTÓW I STATUSY */}
+          {/* LISTA OBIEKTÓW I STATUSY */}
           <div style={{ background: 'white', padding: '25px', borderRadius: '12px', boxShadow: '0 4px 15px rgba(0,0,0,0.05)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                   <h3 style={{ margin: 0 }}>Status Obiektów</h3>
@@ -121,7 +120,7 @@ const Dashboard = ({ token }) => {
               </table>
           </div>
 
-          {/* 3. SZYBKIE AKCJE */}
+          {/* AKCJE */}
           <div style={{ background: 'white', padding: '25px', borderRadius: '12px', boxShadow: '0 4px 15px rgba(0,0,0,0.05)', height: 'fit-content' }}>
               <h3 style={{ margin: '0 0 20px 0' }}>Szybkie Akcje</h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>

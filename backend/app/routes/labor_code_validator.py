@@ -28,7 +28,7 @@ class LaborCodeValidator:
             start_dt = datetime.combine(date_obj, datetime.min.time()) + timedelta(hours=sh, minutes=sm)
             end_dt = datetime.combine(date_obj, datetime.min.time()) + timedelta(hours=eh, minutes=em)
 
-            # Obsługa zmiany nocnej (np. 22:00 - 06:00), koniec jest następnego dnia
+            # Obsługa zmiany nocnej 
             if end_dt <= start_dt:
                 end_dt += timedelta(days=1)
 
@@ -44,14 +44,14 @@ class LaborCodeValidator:
         """
         violations = []
         
-        # Parsowanie obecnej zmiany
+        
         curr_start, curr_end = LaborCodeValidator.parse_shift(current_shift, current_date)
         if not curr_start:
-            return [] # Pusty grafik lub błędny format (walidowany gdzie indziej)
+            return [] 
 
         # 1. LIMIT DOBOWY (Art. 129, 135) 
         duration = (curr_end - curr_start).total_seconds() / 3600
-        if duration > 12: # Zakładamy równoważny, ale ostrzegamy powyżej 12h
+        if duration > 12: 
             violations.append(f"Przekroczony limit dobowy (Art. 135): zmiana trwa {duration}h (max 12h/16h/24h).")
         if duration > 24:
              violations.append("Błąd krytyczny: Zmiana dłuższa niż 24h.")

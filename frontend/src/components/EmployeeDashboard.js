@@ -117,7 +117,6 @@ const EmployeeDashboard = ({ token }) => {
                               return (
                                 <th key={i} style={{ 
                                     padding: '5px', minWidth: '40px', textAlign: 'center', 
-                                    // USUNIĘTO "DZIŚ", ZOSTAWIONO STYLIZACJĘ:
                                     background: isToday ? '#fff3cd' : '#f8f9fa', 
                                     borderBottom: isToday ? '3px solid #ffc107' : '2px solid #ddd',
                                     borderLeft: isToday ? '2px solid #ffc107' : '1px solid #eee',
@@ -155,7 +154,6 @@ const EmployeeDashboard = ({ token }) => {
                                           <td key={i} style={{ 
                                               textAlign: 'center', height: '30px',
                                               border: '1px solid #eee',
-                                              // STYLIZACJA KOMÓREK DLA DZISIAJ:
                                               borderLeft: isToday ? '2px solid #ffc107' : '1px solid #eee',
                                               borderRight: isToday ? '2px solid #ffc107' : '1px solid #eee',
                                               backgroundColor: isToday ? '#fffbeb' : (isSunday(day) ? '#fdfdfd' : 'transparent'),

@@ -3,14 +3,14 @@ import React, { useState, useEffect } from 'react';
 const UserDetails = ({ userId, token, onBack, canEdit }) => {
   const [user, setUser] = useState(null);
   
-  // Listy do selectów
+
   const [objects, setObjects] = useState([]);
   const [departments, setDepartments] = useState([]);
   const [contracts, setContracts] = useState(['Umowa o Pracę', 'Umowa Zlecenie', 'Umowa B2B']);
 
   const [loading, setLoading] = useState(true);
 
-  // Stan do przechowywania hasła po resecie
+  
   const [newGeneratedPassword, setNewGeneratedPassword] = useState(null);
 
   // Formularz
@@ -101,7 +101,7 @@ const UserDetails = ({ userId, token, onBack, canEdit }) => {
     }
   };
 
-  // --- TUTAJ WPROWADZILIŚMY ZMIANĘ ---
+  
   const handleSave = async () => {
       try {
           const payload = {
@@ -120,14 +120,14 @@ const UserDetails = ({ userId, token, onBack, canEdit }) => {
               body: JSON.stringify(payload)
           });
 
-          // Niezależnie czy sukces czy błąd, próbujemy odczytać odpowiedź JSON
+          
           const data = await res.json();
 
           if (res.ok) {
               alert("Zaktualizowano pomyślnie!");
               onBack();
           } else {
-              // Wyświetlamy konkretny komunikat błędu z backendu
+              
               alert("Błąd aktualizacji: " + (data.message || "Wystąpił nieznany problem."));
           }
       } catch (e) { 
@@ -135,7 +135,7 @@ const UserDetails = ({ userId, token, onBack, canEdit }) => {
           alert("Błąd połączenia z serwerem.");
       }
   };
-  // -----------------------------------
+  
 
   const handleDelete = async () => {
       if (!window.confirm(`Czy na pewno chcesz usunąć pracownika: ${formData.name}?`)) {
@@ -210,7 +210,7 @@ const UserDetails = ({ userId, token, onBack, canEdit }) => {
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
           
-          {/* LEWA KOLUMNA */}
+          
           <div>
               <label style={{display: 'block', marginBottom: '5px', fontWeight: 'bold'}}>Imię i Nazwisko</label>
               <input 
@@ -248,7 +248,7 @@ const UserDetails = ({ userId, token, onBack, canEdit }) => {
                )}
           </div>
 
-          {/* PRAWA KOLUMNA */}
+         
           <div>
               <label style={{display: 'block', marginBottom: '5px', fontWeight: 'bold'}}>Obiekt</label>
               {canEdit ? (
