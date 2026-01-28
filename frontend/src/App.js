@@ -95,12 +95,12 @@ const App = () => {
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-                  {/* --- LOGO APLIKACJI --- */}
+                  {/*LOGO APLIKACJI*/}
                   <img 
                     src={logo} 
                     alt="Logo" 
                     style={{ 
-                        height: '75px', // Wysokość dopasowana do paska
+                        height: '75px', // Wys
                         width: 'auto',
                         objectFit: 'contain'
                     }} 
