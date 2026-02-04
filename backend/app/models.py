@@ -117,3 +117,6 @@ class WorkSchedule(db.Model):
         if self.snapshot_templates:
             return json.loads(self.snapshot_templates)
         return []
+    
+    
+   
