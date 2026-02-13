@@ -87,9 +87,85 @@ const EmployeeDashboard = ({ token }) => {
   const getDayName = (date) => date.toLocaleDateString('pl-PL', { weekday: 'short' });
   const isSunday = (date) => date.getDay() === 0;
 
+  // --- Funkcje pomocnicze do obliczania godzin ---
+  const parseTime = (timeStr) => {
+    if (!timeStr) return NaN;
+    const parts = timeStr.trim().split(':');
+    let h = parseInt(parts[0], 10);
+    let m = parts.length > 1 ? parseInt(parts[1], 10) : 0;
+    return h + m / 60;
+  };
+
+  const calculateTotalHours = (empId) => {
+    if (!scheduleData || !scheduleGrid) return 0;
+    let total = 0;
+
+    scheduleGrid.forEach(day => {
+        const dateStr = day.toISOString().split('T')[0];
+        const shiftVal = scheduleData.shifts[`${empId}_${dateStr}`];
+        
+        if (shiftVal) {
+            const trimmed = String(shiftVal).trim();
+            if (!trimmed) return;
+
+            // 1. Sprawdź czy to szablon (np. "R")
+            const template = scheduleData.templates ? scheduleData.templates.find(t => t.abbreviation === trimmed) : null;
+            if (template) {
+                const s = parseTime(template.start_time);
+                const e = parseTime(template.end_time);
+                if (!isNaN(s) && !isNaN(e)) {
+                    let diff = e - s;
+                    if (diff < 0) diff += 24;
+                    total += diff;
+                }
+                return;
+            }
+
+            // 2. Sprawdź czy to zakres (np. "08:00-16:00")
+            if (trimmed.includes('-')) {
+                const parts = trimmed.split('-');
+                if (parts.length === 2) {
+                    const s = parseTime(parts[0]);
+                    const e = parseTime(parts[1]);
+                    if (!isNaN(s) && !isNaN(e)) {
+                        let diff = e - s;
+                        if (diff < 0) diff += 24;
+                        total += diff;
+                    }
+                }
+                return;
+            }
+
+            // 3. Sprawdź czy to liczba (np. "8")
+            const num = parseFloat(trimmed);
+            if (!isNaN(num)) {
+                total += num;
+            }
+        }
+    });
+    return parseFloat(total.toFixed(1));
+  };
+  // -----------------------------------------------
+
   const renderScheduleTable = () => {
       if (loading) return <div>Ładowanie...</div>;
       if (!scheduleData) return <div style={{padding:'20px', color: '#666'}}>{errorMsg || "Wybierz grafik z listy powyżej."}</div>;
+
+      // --- FILTROWANIE PRACOWNIKÓW BEZ ZMIAN ---
+      const activeEmployees = (scheduleData.employees || []).filter(emp => {
+          // Sprawdź czy pracownik ma jakąkolwiek niepustą zmianę w wyświetlanej siatce (scheduleGrid)
+          const hasAnyShift = scheduleGrid.some(day => {
+              const dateStr = day.toISOString().split('T')[0];
+              const shift = scheduleData.shifts[`${emp.id}_${dateStr}`];
+              return shift && String(shift).trim() !== "";
+          });
+          return hasAnyShift;
+      });
+      // -----------------------------------------
+
+      if (activeEmployees.length === 0) {
+          return <div style={{padding:'20px', color: '#666'}}>Brak zmian w tym grafiku dla Twojego widoku.</div>;
+      }
 
       return (
           <div style={{ background: 'white', padding: '20px', borderRadius: '8px', boxShadow: '0 2px 5px rgba(0,0,0,0.1)', overflowX: 'auto' }}>
@@ -129,10 +205,11 @@ const EmployeeDashboard = ({ token }) => {
                                 </th>
                               );
                           })}
+                          <th style={{ width: '60px', background: '#343a40', color: 'white', position: 'sticky', right: 0, zIndex: 10 }}>SUMA</th>
                       </tr>
                   </thead>
                   <tbody>
-                      {scheduleData.employees && scheduleData.employees.map(emp => {
+                      {activeEmployees.map(emp => {
                           const isCurrentUser = emp.id === scheduleData.user_id;
                           return (
                               <tr key={emp.id} style={{ backgroundColor: isCurrentUser ? '#e8f0fe' : 'white' }}>
@@ -163,6 +240,9 @@ const EmployeeDashboard = ({ token }) => {
                                           </td>
                                       );
                                   })}
+                                  <td style={{ fontWeight: 'bold', textAlign: 'center', background: '#f8f9fa', position: 'sticky', right: 0, zIndex: 5, borderLeft: '2px solid #343a40' }}>
+                                      {calculateTotalHours(emp.id)}h
+                                  </td>
                               </tr>
                           );
                       })}

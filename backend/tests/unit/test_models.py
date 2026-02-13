@@ -16,3 +16,6 @@ def test_new_user_password_hashing():
     assert user.password_hash != "TajneHaslo123"  
     assert user.check_password("TajneHaslo123") is True
     assert user.check_password("ZleHaslo") is False
+    
+    
+    

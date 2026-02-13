@@ -27,7 +27,7 @@ def login():
             'must_change_password': user.must_change_password
         }), 200
 
-    return jsonify(message='Invalid email or password'), 401
+    return jsonify(message='Niepoprawne hasło / adres Email'), 401
 
 @bp.route('/change-password', methods=['POST'])
 @jwt_required()
@@ -39,13 +39,13 @@ def change_password():
     user = User.query.get(user_id)
 
     if not user or not bcrypt.check_password_hash(user.password_hash, data.get('current_password')):
-        return jsonify(message='Invalid current password'), 401
+        return jsonify(message='Niepoprawne obecne hasło'), 401
 
     new_password = bcrypt.generate_password_hash(data.get('new_password')).decode('utf-8')
     user.password_hash = new_password
     db.session.commit()
 
-    return jsonify(message='Password changed successfully'), 200
+    return jsonify(message='Hasło ustawione pomyślnie'), 200
 
 @bp.route('/first-password-change', methods=['POST'])
 @jwt_required()
@@ -67,4 +67,4 @@ def first_password_change():
     user.must_change_password = False 
     db.session.commit()
 
-    return jsonify(message='Password changed successfully'), 200
+    return jsonify(message='Hasło ustawione pomyślnie'), 200

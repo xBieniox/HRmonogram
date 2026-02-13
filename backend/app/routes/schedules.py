@@ -28,9 +28,7 @@ def calculate_schedule_dates(ws):
     return start, end, sched_type
 
 def get_schedule_templates(ws):
-   
     templates = ws.get_templates()
-    
     
     if not templates:
         db_templates = ShiftTemplate.query.filter_by(object_id=ws.object_id).all()
@@ -482,9 +480,14 @@ def get_my_schedules_list():
     if not user or not user.object_id:
         return jsonify(message="Brak obiektu"), 404
 
-    schedules = WorkSchedule.query.filter_by(
-        object_id=user.object_id, is_published=True
-    ).order_by(desc(WorkSchedule.start_date)).all()
+    query = WorkSchedule.query.filter_by(object_id=user.object_id, is_published=True)
+
+    if user.role == 'employee':
+        query = query.join(Schedule, Schedule.work_schedule_id == WorkSchedule.id)\
+                     .filter(Schedule.employee_id == user.id)\
+                     .distinct()
+
+    schedules = query.order_by(desc(WorkSchedule.start_date)).all()
 
     today = datetime.now().date()
     response_data = { "current": [], "upcoming": [], "history": [] }
@@ -518,7 +521,6 @@ def get_employee_schedule_details(schedule_id):
 
     ws = WorkSchedule.query.get_or_404(schedule_id)
 
-   
     if ws.object_id != user.object_id or not ws.is_published:
         return jsonify(message="Brak dostępu do tego grafiku."), 403
 
@@ -531,7 +533,6 @@ def get_employee_schedule_details(schedule_id):
 
     employees = User.query.filter_by(object_id=user.object_id).all()
     employees_list = [{"id": e.id, "name": e.name} for e in employees]
-    
     
     templates = get_schedule_templates(ws)
 
@@ -557,10 +558,17 @@ def get_my_current_schedule():
     if not user or not user.object_id:
         return jsonify(message="Nie jesteś przypisany do żadnego obiektu."), 404
 
-    schedules = WorkSchedule.query.filter_by(
+    query = WorkSchedule.query.filter_by(
         object_id=user.object_id, 
         is_published=True
-    ).order_by(desc(WorkSchedule.start_date)).all()
+    )
+
+    if user.role == 'employee':
+        query = query.join(Schedule, Schedule.work_schedule_id == WorkSchedule.id)\
+                     .filter(Schedule.employee_id == user.id)\
+                     .distinct()
+
+    schedules = query.order_by(desc(WorkSchedule.start_date)).all()
 
     today = datetime.now().date()
     active_schedule = None
@@ -584,7 +592,6 @@ def get_my_current_schedule():
     employees = User.query.filter_by(object_id=user.object_id).all()
     employees_list = [{"id": e.id, "name": e.name} for e in employees]
     
-  
     templates = get_schedule_templates(active_schedule)
 
     return jsonify({
