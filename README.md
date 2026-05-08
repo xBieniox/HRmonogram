@@ -24,25 +24,45 @@ Projekt został zbudowany z wykorzystaniem nowoczesnej architektury aplikacji in
 
 ## 📸 Zrzuty Ekranu
 
-<img width="1127" height="677" alt="image" src="https://github.com/user-attachments/assets/b3becbdf-2678-45bf-9f6f-c6e650938eb6" />
+<img alt="Panel statystyk HR" src="https://github.com/user-attachments/assets/b3becbdf-2678-45bf-9f6f-c6e650938eb6" />
 
+*Rys 1. Widok domyślny – panel statystyk pracownika HR.*
 
-<img width="1118" height="797" alt="image" src="https://github.com/user-attachments/assets/5f3f0780-4a84-43d0-9083-5e70f9f895c2" />
+---
 
-<img width="1151" height="777" alt="image" src="https://github.com/user-attachments/assets/1df8725a-caa4-43a2-8816-52f6a6271f83" />
+<img alt="Widok pracownika" src="https://github.com/user-attachments/assets/5f3f0780-4a84-43d0-9083-5e70f9f895c2" />
 
-<img width="1176" height="702" alt="image" src="https://github.com/user-attachments/assets/b45fa202-ec63-4626-be16-82e63db2acfb" />
+*Rys 2. Widok domyślny z perspektywy panelu pracownika.*
 
-<img width="1148" height="557" alt="image" src="https://github.com/user-attachments/assets/7935e4eb-eeae-4aee-b51b-e9af7def1dc4" />
+---
 
-<img width="1165" height="862" alt="image" src="https://github.com/user-attachments/assets/7c7b9676-6a79-48a1-995c-22f32ba9b582" />
-*Widok preferencji podzielony na dwie kolumny: parametry po lewej,
-szablony po prawej
-<img width="1097" height="847" alt="image" src="https://github.com/user-attachments/assets/1f95b17a-33fe-4c21-b0c0-7877ff68f9ce" />
-*Interfejs kreatora harmonogramu z siatką pracowników i dniami miesiąca
+<img alt="Karty obiektów" src="https://github.com/user-attachments/assets/1df8725a-caa4-43a2-8816-52f6a6271f83" />
 
+*Rys 3. Widok początkowy menedżera z kartami zarządzanych obiektów i formularzem dodawania.*
 
+---
 
+<img alt="Zarządzanie obiektem" src="https://github.com/user-attachments/assets/b45fa202-ec63-4626-be16-82e63db2acfb" />
+
+*Rys 4. Widok szczegółów obiektu: lista działów (po lewej) oraz przypisani pracownicy (po prawej).*
+
+---
+
+<img alt="Lista grafików" src="https://github.com/user-attachments/assets/7935e4eb-eeae-4aee-b51b-e9af7def1dc4" />
+
+*Rys 5. Lista aktywnych grafików dla danego obiektu oraz panel przycisków funkcyjnych.*
+
+---
+
+<img alt="Preferencje" src="https://github.com/user-attachments/assets/7c7b9676-6a79-48a1-995c-22f32ba9b582" />
+
+*Rys 6. Konfiguracja preferencji harmonogramu: parametry (po lewej) i szablony (po prawej).*
+
+---
+
+<img alt="Kreator harmonogramu" src="https://github.com/user-attachments/assets/1f95b17a-33fe-4c21-b0c0-7877ff68f9ce" />
+
+*Rys 7. Interfejs głównego kreatora harmonogramu z siatką pracowników i dniami miesiąca.*
 
 ## 🎯 Plany Rozwoju (Roadmap)
 - [ ] Wdrożenie modułu samodzielnego zgłaszania dyspozycyjności przez pracowników.
